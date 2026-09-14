@@ -6,19 +6,29 @@ use std::time::{Duration, Instant};
 
 mod config;
 mod configui;
+#[cfg(windows)]
 mod dpad;
 mod emulate;
 mod hypershift;
+mod key;
 mod lighting;
+mod platform;
+mod remap;
+#[cfg(windows)]
 mod tray;
-mod vkname;
-use windows::Win32::Foundation::BOOL;
-use windows::Win32::System::Console::{FreeConsole, SetConsoleCtrlHandler};
-use windows::Win32::UI::Input::KeyboardAndMouse::{
-    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_EXTENDEDKEY,
-    KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, VIRTUAL_KEY, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_RCONTROL,
-    VK_RMENU, VK_RSHIFT,
-};
+use key::Key;
+// Every synthetic keystroke the crate emits goes through the OS backend
+// selected in platform/mod.rs; `crate::send_key` stays the crate-wide name
+// for it.
+pub(crate) use platform::send_key;
+
+// Public repo's Releases page — where a newer version, if any, would be
+// published. This project has no auto-update check of its own (no telemetry,
+// no background network calls by design); the tray menu item just saves the
+// user from having to remember the URL.
+pub const RELEASES_URL: &str = "https://github.com/ultramonaka/open-tartarus-driver/releases";
+// Where `configui`'s local web server listens (see configui.rs).
+pub const CONFIGUI_URL: &str = "http://127.0.0.1:7878/";
 
 // ===========================================================================
 // Locating config.toml / logs/run.log relative to where the binary is
@@ -222,165 +232,94 @@ const T_OFF: u8 = 80;
 // whenever config.toml doesn't override a given key (or doesn't exist at
 // all) — see config::DriverConfig::defaults(). Editing this array changes
 // what a machine with no config.toml (or an incomplete one) falls back to.
-const TEST_KEYMAP: [VIRTUAL_KEY; NUM_KEYS] = [
-    VIRTUAL_KEY(0x31), // key01 -> '1'
-    VIRTUAL_KEY(0x32), // key02 -> '2'
-    VIRTUAL_KEY(0x33), // key03 -> '3'
-    VIRTUAL_KEY(0x34), // key04 -> '4'
-    VIRTUAL_KEY(0x35), // key05 -> '5'
-    VIRTUAL_KEY(0x36), // key06 -> '6'
-    VIRTUAL_KEY(0x37), // key07 -> '7'
-    VIRTUAL_KEY(0x38), // key08 -> '8'
-    VIRTUAL_KEY(0x39), // key09 -> '9'
-    VIRTUAL_KEY(0x30), // key10 -> '0'
-    VIRTUAL_KEY(0x41), // key11 -> 'A'
-    VIRTUAL_KEY(0x42), // key12 -> 'B'
-    VIRTUAL_KEY(0x43), // key13 -> 'C'
-    VIRTUAL_KEY(0x44), // key14 -> 'D'
-    VIRTUAL_KEY(0x45), // key15 -> 'E'
-    VIRTUAL_KEY(0x46), // key16 -> 'F'
-    VIRTUAL_KEY(0x47), // key17 -> 'G'
-    VIRTUAL_KEY(0x48), // key18 -> 'H'
-    VIRTUAL_KEY(0x49), // key19 -> 'I'
-    VIRTUAL_KEY(0x4A), // key20 -> 'J'
+const TEST_KEYMAP: [Key; NUM_KEYS] = [
+    Key::Digit1, // key01 -> '1'
+    Key::Digit2, // key02 -> '2'
+    Key::Digit3, // key03 -> '3'
+    Key::Digit4, // key04 -> '4'
+    Key::Digit5, // key05 -> '5'
+    Key::Digit6, // key06 -> '6'
+    Key::Digit7, // key07 -> '7'
+    Key::Digit8, // key08 -> '8'
+    Key::Digit9, // key09 -> '9'
+    Key::Digit0, // key10 -> '0'
+    Key::A,      // key11 -> 'A'
+    Key::B,      // key12 -> 'B'
+    Key::C,      // key13 -> 'C'
+    Key::D,      // key14 -> 'D'
+    Key::E,      // key15 -> 'E'
+    Key::F,      // key16 -> 'F'
+    Key::G,      // key17 -> 'G'
+    Key::H,      // key18 -> 'H'
+    Key::I,      // key19 -> 'I'
+    Key::J,      // key20 -> 'J'
 ];
 
 // TEST/PLACEHOLDER Layer1 (Hypershift) keymap — not a real layout, just enough
 // to prove the layer switch end to end. key01..key20 -> F1..F20 so Layer1 hits
 // are trivially distinguishable from the Default layer during testing.
-const LAYER1_TEST_KEYMAP: [VIRTUAL_KEY; NUM_KEYS] = [
-    VIRTUAL_KEY(0x70), // key01 -> F1
-    VIRTUAL_KEY(0x71), // key02 -> F2
-    VIRTUAL_KEY(0x72), // key03 -> F3
-    VIRTUAL_KEY(0x73), // key04 -> F4
-    VIRTUAL_KEY(0x74), // key05 -> F5
-    VIRTUAL_KEY(0x75), // key06 -> F6
-    VIRTUAL_KEY(0x76), // key07 -> F7
-    VIRTUAL_KEY(0x77), // key08 -> F8
-    VIRTUAL_KEY(0x78), // key09 -> F9
-    VIRTUAL_KEY(0x79), // key10 -> F10
-    VIRTUAL_KEY(0x7A), // key11 -> F11
-    VIRTUAL_KEY(0x7B), // key12 -> F12
-    VIRTUAL_KEY(0x7C), // key13 -> F13
-    VIRTUAL_KEY(0x7D), // key14 -> F14
-    VIRTUAL_KEY(0x7E), // key15 -> F15
-    VIRTUAL_KEY(0x7F), // key16 -> F16
-    VIRTUAL_KEY(0x80), // key17 -> F17
-    VIRTUAL_KEY(0x81), // key18 -> F18
-    VIRTUAL_KEY(0x82), // key19 -> F19
-    VIRTUAL_KEY(0x83), // key20 -> F20
+const LAYER1_TEST_KEYMAP: [Key; NUM_KEYS] = [
+    Key::F1,
+    Key::F2,
+    Key::F3,
+    Key::F4,
+    Key::F5,
+    Key::F6,
+    Key::F7,
+    Key::F8,
+    Key::F9,
+    Key::F10,
+    Key::F11,
+    Key::F12,
+    Key::F13,
+    Key::F14,
+    Key::F15,
+    Key::F16,
+    Key::F17,
+    Key::F18,
+    Key::F19,
+    Key::F20,
 ];
 
 // TEST/PLACEHOLDER Layer2 (Hypershift toggle, 3rd layer) keymap — same
 // throwaway style as TEST_KEYMAP/LAYER1_TEST_KEYMAP, only reachable when
 // config.toml sets [hypershift] switch_style="toggle", layer_count=3. Reuses
-// vkname.rs's 20 named specials (LEFT..INSERT) so it's trivially
+// key.rs's 20 named specials (LEFT..INSERT) so it's trivially
 // distinguishable from both other layers during testing without needing any
-// new vkname vocabulary.
-const LAYER2_TEST_KEYMAP: [VIRTUAL_KEY; NUM_KEYS] = [
-    VIRTUAL_KEY(0x25), // key01 -> LEFT
-    VIRTUAL_KEY(0x26), // key02 -> UP
-    VIRTUAL_KEY(0x27), // key03 -> RIGHT
-    VIRTUAL_KEY(0x28), // key04 -> DOWN
-    VIRTUAL_KEY(0x20), // key05 -> SPACE
-    VIRTUAL_KEY(0x0D), // key06 -> ENTER
-    VIRTUAL_KEY(0x09), // key07 -> TAB
-    VIRTUAL_KEY(0x1B), // key08 -> ESCAPE
-    VIRTUAL_KEY(0x08), // key09 -> BACKSPACE
-    VIRTUAL_KEY(0xA0), // key10 -> LSHIFT
-    VIRTUAL_KEY(0xA1), // key11 -> RSHIFT
-    VIRTUAL_KEY(0xA2), // key12 -> LCTRL
-    VIRTUAL_KEY(0xA3), // key13 -> RCTRL
-    VIRTUAL_KEY(0xA4), // key14 -> LALT
-    VIRTUAL_KEY(0xA5), // key15 -> RALT
-    VIRTUAL_KEY(0x24), // key16 -> HOME
-    VIRTUAL_KEY(0x23), // key17 -> END
-    VIRTUAL_KEY(0x21), // key18 -> PAGEUP
-    VIRTUAL_KEY(0x22), // key19 -> PAGEDOWN
-    VIRTUAL_KEY(0x2D), // key20 -> INSERT
+// new key vocabulary.
+const LAYER2_TEST_KEYMAP: [Key; NUM_KEYS] = [
+    Key::Left,
+    Key::Up,
+    Key::Right,
+    Key::Down,
+    Key::Space,
+    Key::Enter,
+    Key::Tab,
+    Key::Escape,
+    Key::Backspace,
+    Key::LShift,
+    Key::RShift,
+    Key::LCtrl,
+    Key::RCtrl,
+    Key::LAlt,
+    Key::RAlt,
+    Key::Home,
+    Key::End,
+    Key::PageUp,
+    Key::PageDown,
+    Key::Insert,
 ];
 
-// Set by console_ctrl_handler (Ctrl+C, Ctrl+Break, console window closed,
-// logoff, or shutdown) so the main analog-read loop can notice and exit its
-// own way — running the existing "force-release any key still logically
-// held" cleanup at the bottom of main() — instead of Windows just killing
-// the process outright, which would skip that cleanup and could leave a key
-// stuck down on the OS. The loop's sleep granularity (500us) means this is
-// noticed almost immediately, well within the few seconds Windows grants a
-// console handler to actually exit.
-static SHUTDOWN_REQUESTED: AtomicBool = AtomicBool::new(false);
-
-unsafe extern "system" fn console_ctrl_handler(_ctrl_type: u32) -> BOOL {
-    SHUTDOWN_REQUESTED.store(true, Ordering::SeqCst);
-    BOOL(1) // handled: don't run Windows' default action (immediate termination)
-}
-
-// Left/Right pairs whose scan codes SendInput's own wVk-only path (wScan=0,
-// no KEYEVENTF_SCANCODE — what every other key here relies on) does not
-// reliably preserve. Confirmed on real hardware/Valorant (2026-07-27):
-// LSHIFT arrived as RSHIFT, and RSHIFT arrived as nothing at all. Unlike
-// Ctrl/Alt, Shift's two sides don't share a base scan code distinguished by
-// the extended-key flag — they are genuinely different PC/AT Set 1 codes
-// (0x2A vs 0x36) with no such flag to fall back on, so this pair is where
-// Windows' own wVk->scancode derivation is known to fail. Ctrl/Alt use the
-// same base code (Ctrl=0x1D, Alt=0x38) as their Left variant, extended for
-// Right — included here too since they share the same theoretical risk
-// (SendInput deriving the wrong one from wVk alone), even though only Shift
-// has been confirmed broken in practice so far.
-//
-// Every other key (letters, digits, F-keys, media keys, etc.) keeps using
-// the plain wVk-only path below unchanged, since that's already
-// hardware-verified working — this table only overrides the handful of
-// keys where it isn't.
-fn explicit_scan_code(vk: VIRTUAL_KEY) -> Option<(u16, bool)> {
-    // (scan code, is_extended)
-    match vk {
-        VK_LSHIFT => Some((0x2A, false)),
-        VK_RSHIFT => Some((0x36, false)),
-        VK_LCONTROL => Some((0x1D, false)),
-        VK_RCONTROL => Some((0x1D, true)),
-        VK_LMENU => Some((0x38, false)),
-        VK_RMENU => Some((0x38, true)),
-        _ => None,
-    }
-}
-
-fn send_key(vk: VIRTUAL_KEY, key_up: bool) {
-    let key_up_flag = if key_up { KEYEVENTF_KEYUP } else { KEYBD_EVENT_FLAGS(0) };
-    let ki = match explicit_scan_code(vk) {
-        // Scan-code-based send: wVk is ignored by SendInput once
-        // KEYEVENTF_SCANCODE is set, so it's left at 0 per the documented
-        // contract for that flag.
-        Some((scan, extended)) => {
-            let mut flags = key_up_flag | KEYEVENTF_SCANCODE;
-            if extended {
-                flags |= KEYEVENTF_EXTENDEDKEY;
-            }
-            KEYBDINPUT {
-                wVk: VIRTUAL_KEY(0),
-                wScan: scan,
-                dwFlags: flags,
-                time: 0,
-                dwExtraInfo: 0,
-            }
-        }
-        // Unchanged, hardware-verified path for every other key.
-        None => KEYBDINPUT {
-            wVk: vk,
-            wScan: 0,
-            dwFlags: key_up_flag,
-            time: 0,
-            dwExtraInfo: 0,
-        },
-    };
-    let input = INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 { ki },
-    };
-    unsafe {
-        SendInput(&[input], std::mem::size_of::<INPUT>() as i32);
-    }
-}
+// Set by platform::install_shutdown_handler's OS hook (Windows: Ctrl+C,
+// Ctrl+Break, console window closed, logoff, or shutdown; elsewhere:
+// SIGINT/SIGTERM/SIGHUP) and by the tray menu's Quit, so the main
+// analog-read loop can notice and exit its own way — running the existing
+// "force-release any key still logically held" cleanup at the bottom of
+// run_driver — instead of the OS just killing the process outright, which
+// would skip that cleanup and could leave a key stuck down. The loop's
+// sleep granularity (500us) means this is noticed almost immediately, well
+// within the few seconds Windows grants a console handler to actually exit.
+pub(crate) static SHUTDOWN_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 // docs/DESIGN.md §6② step 3: on the transition BACK TO Default (from any other
 // layer — not on every transition, and specifically not on the Default ->
@@ -398,7 +337,7 @@ fn send_key(vk: VIRTUAL_KEY, key_up: bool) {
 // driver loop and `emulate` mode (see emulate.rs) so both exercise this edge
 // exactly the same way.
 pub(crate) fn force_keyup_on_layer_change(
-    pressed_vk: &mut [Option<VIRTUAL_KEY>; NUM_KEYS],
+    pressed_vk: &mut [Option<Key>; NUM_KEYS],
     start: Instant,
 ) {
     for (i, slot) in pressed_vk.iter_mut().enumerate() {
@@ -431,7 +370,7 @@ fn layer_name(layer: usize) -> String {
 pub(crate) fn process_key_depths(
     depths: &[u8; NUM_KEYS],
     layer: usize,
-    pressed_vk: &mut [Option<VIRTUAL_KEY>; NUM_KEYS],
+    pressed_vk: &mut [Option<Key>; NUM_KEYS],
     start: Instant,
 ) {
     for i in 0..NUM_KEYS {
@@ -471,11 +410,21 @@ pub(crate) fn process_key_depths(
 // startup) and configui's try_open_analog_devices (which must fail soft
 // instead, since it runs inside the long-lived config web server).
 pub(crate) fn analog_device_infos(api: &HidApi) -> Vec<hidapi::DeviceInfo> {
-    api.device_list()
+    let infos = api
+        .device_list()
         .filter(|d| d.vendor_id() == VID && d.product_id() == PID)
         .filter(|d| !(d.usage_page() == 0x0001 && (d.usage() == 0x0002 || d.usage() == 0x0006)))
-        .cloned()
-        .collect()
+        .cloned();
+    // macOS: hidapi reports one entry per (IOHIDDevice, usage pair) rather
+    // than one per top-level collection, so a multi-usage interface shows
+    // up several times under the SAME path. Opening it once is enough (and
+    // opening it twice fails outright if the first open seized it).
+    #[cfg(target_os = "macos")]
+    let infos = {
+        let mut seen = std::collections::HashSet::new();
+        infos.filter(move |d| seen.insert(d.path().to_owned()))
+    };
+    infos.collect()
 }
 
 fn open_analog_devices(api: &HidApi) -> Vec<(i32, hidapi::HidDevice)> {
@@ -593,15 +542,7 @@ fn main() {
     let duration_secs: u64 = subcommand.and_then(|s| s.parse().ok()).unwrap_or(0);
     let run_forever = duration_secs == 0;
 
-    unsafe {
-        if SetConsoleCtrlHandler(Some(console_ctrl_handler), true).is_err() {
-            eprintln!(
-                "WARNING: failed to install Ctrl+C handler — stopping via Ctrl+C may leave a \
-                 key stuck down if one happens to be held at that exact moment. Ctrl+C still \
-                 works to end the process, just without the usual cleanup."
-            );
-        }
-    }
+    platform::install_shutdown_handler();
 
     run_driver(run_forever, duration_secs);
 }
@@ -615,12 +556,19 @@ fn main() {
 // path — indefinitely, stopped by the tray menu's "終了" (or Ctrl+C, on the
 // off chance a console is still attached after all).
 fn run_tray_mode() {
-    unsafe {
-        let _ = FreeConsole();
-    }
+    platform::detach_console();
 
     std::thread::spawn(configui::run_configui_server);
+    #[cfg(windows)]
     tray::spawn_tray_icon_thread();
+    // macOS: a real menu-bar icon is planned (docs/MACOS_PORT_PLAN.md Phase
+    // 4); until then `tray` mode is just "driver + configui server, no
+    // console handler", stopped with Ctrl+C / SIGTERM.
+    #[cfg(not(windows))]
+    {
+        platform::install_shutdown_handler();
+        println!("tray mode: no tray icon on this platform yet — settings page at {CONFIGUI_URL}");
+    }
 
     run_driver(true, 0);
 }
@@ -696,7 +644,7 @@ fn run_driver(run_forever: bool, duration_secs: u64) {
     // dpad::run_interception_thread only falls back to
     // hypershift::spawn_hypershift_hook_thread() itself, internally, if
     // Interception isn't installed/running.
-    dpad::spawn_interception_thread();
+    platform::spawn_input_capture();
 
     // NOTE: reading these HidDevice handles from a *different* thread than the
     // one that opened them silently returned zero reports in testing on
@@ -708,7 +656,7 @@ fn run_driver(run_forever: bool, duration_secs: u64) {
     // was actually sent at press time, so KeyUp (normal, forced-by-layer-exit,
     // or forced-at-shutdown) always releases under the keymap the key was
     // pressed with, even if the layer changed in between.
-    let mut pressed_vk: [Option<VIRTUAL_KEY>; NUM_KEYS] = [None; NUM_KEYS];
+    let mut pressed_vk: [Option<Key>; NUM_KEYS] = [None; NUM_KEYS];
     let mut layer_prev: usize = 0;
     let start = Instant::now();
     let deadline = Duration::from_secs(duration_secs);
@@ -805,7 +753,7 @@ fn run_driver(run_forever: bool, duration_secs: u64) {
             send_key(vk, true);
         }
     }
-    dpad::release_held_dpad_test_keys();
+    remap::release_held();
 
     println!("Done.");
 }

@@ -10,13 +10,17 @@
 # Every value is a key name from a closed vocabulary: single digits "0".."9",
 # single letters "A".."Z", "F1".."F24", the arrow keys "LEFT"/"UP"/"RIGHT"/
 # "DOWN", these named keys: "SPACE", "ENTER", "TAB", "ESCAPE", "BACKSPACE",
-# "LSHIFT", "RSHIFT", "LCTRL", "RCTRL", "LALT", "RALT", "HOME", "END",
-# "PAGEUP", "PAGEDOWN", "INSERT", "DELETE", and these media/volume keys (new
-# in v1.0.5): "MEDIA_PLAY_PAUSE", "MEDIA_STOP", "MEDIA_NEXT", "MEDIA_PREV",
-# "VOLUME_MUTE", "VOLUME_DOWN", "VOLUME_UP". An unrecognized name (typo,
-# wrong case handled automatically but an unknown word is not) falls back to
-# the built-in default for that one entry and prints a warning to
-# logs/run.log — it never crashes the driver or breaks other entries.
+# "LSHIFT", "RSHIFT", "LCTRL", "RCTRL", "LALT", "RALT", "LCMD", "RCMD",
+# "HOME", "END", "PAGEUP", "PAGEDOWN", "INSERT", "DELETE", and these
+# media/volume keys (new in v1.0.5): "MEDIA_PLAY_PAUSE", "MEDIA_STOP",
+# "MEDIA_NEXT", "MEDIA_PREV", "VOLUME_MUTE", "VOLUME_DOWN", "VOLUME_UP".
+# "LCMD"/"RCMD" are the Windows (Win) keys on Windows and Command on macOS;
+# "LALT"/"RALT" are Option on macOS. macOS has no equivalent for
+# "F21".."F24" or "MEDIA_STOP" — those names are rejected there. An
+# unrecognized name (typo, wrong case handled automatically but an unknown
+# word is not) falls back to the built-in default for that one entry and
+# prints a warning to logs/run.log — it never crashes the driver or breaks
+# other entries.
 #
 # [keys.default] / [keys.layer1] / [keys.layer2]: the 20 analog keys, numbered
 # key01..key20 matching the number printed on each physical keycap.

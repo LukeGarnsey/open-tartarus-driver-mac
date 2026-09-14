@@ -31,7 +31,7 @@ pub use payload::ConfigPayload;
 
 use crate::lighting::{self, Color, Effect, LayerIndicatorConfig, LightingConfig, WaveDirection};
 use crate::{MAX_LAYERS, NUM_KEYS};
-use windows::Win32::UI::Input::KeyboardAndMouse::{VIRTUAL_KEY, VK_LMENU};
+use crate::key::Key;
 
 // config.toml's path is resolved at runtime relative to the running binary
 // — see main.rs's `app_root()`/`config_path()` for why this isn't a
@@ -41,9 +41,9 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{VIRTUAL_KEY, VK_LMENU};
 // entry. These are exactly the placeholder TEST_KEYMAP / LAYER1_TEST_KEYMAP /
 // D-pad-wheel-middle-click test keys the driver shipped with before Phase 4,
 // so a machine with no config.toml behaves identically to before.
-const DEFAULT_ANALOG: [VIRTUAL_KEY; NUM_KEYS] = crate::TEST_KEYMAP;
-const DEFAULT_LAYER1: [VIRTUAL_KEY; NUM_KEYS] = crate::LAYER1_TEST_KEYMAP;
-const DEFAULT_LAYER2: [VIRTUAL_KEY; NUM_KEYS] = crate::LAYER2_TEST_KEYMAP;
+const DEFAULT_ANALOG: [Key; NUM_KEYS] = crate::TEST_KEYMAP;
+const DEFAULT_LAYER1: [Key; NUM_KEYS] = crate::LAYER1_TEST_KEYMAP;
+const DEFAULT_LAYER2: [Key; NUM_KEYS] = crate::LAYER2_TEST_KEYMAP;
 
 // index 0 = Default, 1 = Layer1, 2 = Layer2 (main.rs::MAX_LAYERS). [keys.layer2]
 // is always parsed/stored regardless of [hypershift] mode/switch_style/
@@ -51,7 +51,7 @@ const DEFAULT_LAYER2: [VIRTUAL_KEY; NUM_KEYS] = crate::LAYER2_TEST_KEYMAP;
 // layer_count=3 (see hypershift.rs), but harmless to keep configured
 // otherwise, same fail-open philosophy as everything else in this module.
 pub struct AnalogKeymap {
-    pub layers: [[VIRTUAL_KEY; NUM_KEYS]; MAX_LAYERS],
+    pub layers: [[Key; NUM_KEYS]; MAX_LAYERS],
 }
 
 // v1.0.5: what the physical "Hyper Response" thumb button does. LayerSwitch
@@ -115,17 +115,17 @@ pub struct HypershiftConfig {
     pub layer_count: u8,
     // Only meaningful for ModifierKey mode: the key sent on press/release in
     // place of the button's own (suppressed) physical Alt keycode.
-    pub modifier_key: VIRTUAL_KEY,
+    pub modifier_key: Key,
 }
 
 pub struct DpadKeymap {
-    pub left: VIRTUAL_KEY,
-    pub up: VIRTUAL_KEY,
-    pub right: VIRTUAL_KEY,
-    pub down: VIRTUAL_KEY,
-    pub wheel_up: VIRTUAL_KEY,
-    pub wheel_down: VIRTUAL_KEY,
-    pub middle_click: VIRTUAL_KEY,
+    pub left: Key,
+    pub up: Key,
+    pub right: Key,
+    pub down: Key,
+    pub wheel_up: Key,
+    pub wheel_down: Key,
+    pub middle_click: Key,
 }
 
 // Hysteresis thresholds (docs/DESIGN.md §6.1) on the raw 0-255 analog depth
@@ -192,16 +192,16 @@ impl DriverConfig {
                 mode: HypershiftMode::LayerSwitch,
                 switch_style: SwitchStyle::Momentary,
                 layer_count: 2,
-                modifier_key: VK_LMENU,
+                modifier_key: Key::LAlt,
             },
             dpad: DpadKeymap {
-                left: crate::dpad::DPAD_ARROW_TEST_KEYMAP_LEFT,
-                up: crate::dpad::DPAD_ARROW_TEST_KEYMAP_UP,
-                right: crate::dpad::DPAD_ARROW_TEST_KEYMAP_RIGHT,
-                down: crate::dpad::DPAD_ARROW_TEST_KEYMAP_DOWN,
-                wheel_up: crate::dpad::WHEEL_UP_TEST_KEY,
-                wheel_down: crate::dpad::WHEEL_DOWN_TEST_KEY,
-                middle_click: crate::dpad::MIDDLE_CLICK_TEST_KEY,
+                left: crate::remap::DPAD_ARROW_TEST_KEYMAP_LEFT,
+                up: crate::remap::DPAD_ARROW_TEST_KEYMAP_UP,
+                right: crate::remap::DPAD_ARROW_TEST_KEYMAP_RIGHT,
+                down: crate::remap::DPAD_ARROW_TEST_KEYMAP_DOWN,
+                wheel_up: crate::remap::WHEEL_UP_TEST_KEY,
+                wheel_down: crate::remap::WHEEL_DOWN_TEST_KEY,
+                middle_click: crate::remap::MIDDLE_CLICK_TEST_KEY,
             },
             actuation: Actuation {
                 t_on: crate::T_ON,
@@ -258,6 +258,6 @@ mod tests {
         assert_eq!(cfg.analog.layers[0], crate::TEST_KEYMAP);
         assert_eq!(cfg.analog.layers[1], crate::LAYER1_TEST_KEYMAP);
         assert_eq!(cfg.analog.layers[2], crate::LAYER2_TEST_KEYMAP);
-        assert_eq!(cfg.dpad.left, crate::dpad::DPAD_ARROW_TEST_KEYMAP_LEFT);
+        assert_eq!(cfg.dpad.left, crate::remap::DPAD_ARROW_TEST_KEYMAP_LEFT);
     }
 }

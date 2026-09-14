@@ -89,9 +89,14 @@
 // kernel driver/service itself is not installed or not running — the likely
 // case once steps 1/2 above are also satisfied) is a separate, already-safe
 // path: it is a normal Option, not a crash of any kind.
+//
+// macOS port: the emit/bookkeeping half of this (which key to send for
+// which arrow, wheel taps, the held-key tracker) moved to remap.rs so the
+// macOS backend can reuse it verbatim; this file is now purely the
+// Windows/Interception I/O shell around those handlers.
 
-use crate::config::DpadKeymap;
-use crate::{cfg, eprintln, println, send_key, vkname};
+use crate::remap::{self, DpadDirection};
+use crate::{eprintln, println};
 use interception::{
     is_invalid, is_keyboard, is_mouse, Device, Filter, Interception, KeyFilter, KeyState,
     MouseFilter, MouseFlags, MouseState, ScanCode, Stroke,
@@ -100,7 +105,6 @@ use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 use windows::core::w;
 use windows::Win32::System::LibraryLoader::LoadLibraryW;
-use windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY;
 
 // Scan codes for the arrow-key cluster. The interception crate's `ScanCode`
 // enum only names the BASE (non-extended) PC/XT set — arrow keys reuse the
@@ -127,31 +131,15 @@ const SCANCODE_DOWN: u16 = ScanCode::Numpad2 as u16;
 // notes on handle_interception_keyboard below).
 const SCANCODE_ALT: u16 = ScanCode::LeftAlt as u16;
 
-// TEST/PLACEHOLDER D-pad keymap — same throwaway style as main.rs's
-// TEST_KEYMAP. The letters deliberately avoid everything TEST_KEYMAP
-// ('1'..'0', 'A'..'J') and LAYER1_TEST_KEYMAP (F1..F20) already use (which
-// rules out the obvious W/A/S/D set: A and D are taken), so remapped output
-// is unambiguous during testing. These are the config module's built-in
-// defaults for the D-pad/wheel/middle-click (see config::DriverConfig::defaults()).
-pub const DPAD_ARROW_TEST_KEYMAP_LEFT: VIRTUAL_KEY = VIRTUAL_KEY(0x4B); // 'K'
-pub const DPAD_ARROW_TEST_KEYMAP_UP: VIRTUAL_KEY = VIRTUAL_KEY(0x57); // 'W'
-pub const DPAD_ARROW_TEST_KEYMAP_RIGHT: VIRTUAL_KEY = VIRTUAL_KEY(0x4C); // 'L'
-pub const DPAD_ARROW_TEST_KEYMAP_DOWN: VIRTUAL_KEY = VIRTUAL_KEY(0x53); // 'S'
-pub const WHEEL_UP_TEST_KEY: VIRTUAL_KEY = VIRTUAL_KEY(0x4F); // wheel up -> 'O' (tap per notch)
-pub const WHEEL_DOWN_TEST_KEY: VIRTUAL_KEY = VIRTUAL_KEY(0x50); // wheel down -> 'P' (tap per notch)
-pub const MIDDLE_CLICK_TEST_KEY: VIRTUAL_KEY = VIRTUAL_KEY(0x4D); // middle click -> 'M' (held)
-
-// Maps an arrow scan code to its configured remap key (Phase 4: from
-// config.toml, or the built-in placeholder defaults if unset — see
-// config/load.rs). Returns None for anything that is not one of the four arrow
-// scan codes (including plain numpad presses without the E0 flag, which the
-// caller filters separately).
-fn dpad_arrow_test_key_for(scancode: u16, dpad: &DpadKeymap) -> Option<VIRTUAL_KEY> {
+// Maps an arrow scan code to its D-pad direction. Returns None for anything
+// that is not one of the four arrow scan codes (including plain numpad
+// presses without the E0 flag, which the caller filters separately).
+fn dpad_arrow_direction_for(scancode: u16) -> Option<DpadDirection> {
     match scancode {
-        SCANCODE_LEFT => Some(dpad.left),
-        SCANCODE_UP => Some(dpad.up),
-        SCANCODE_RIGHT => Some(dpad.right),
-        SCANCODE_DOWN => Some(dpad.down),
+        SCANCODE_LEFT => Some(DpadDirection::Left),
+        SCANCODE_UP => Some(DpadDirection::Up),
+        SCANCODE_RIGHT => Some(DpadDirection::Right),
+        SCANCODE_DOWN => Some(DpadDirection::Down),
         _ => None,
     }
 }
@@ -173,11 +161,6 @@ fn hwid_string_is_tartarus(hardware_id: &str) -> bool {
     TARTARUS_HWID_MARKERS.iter().all(|m| upper.contains(m))
 }
 
-// Remapped keys currently held down (D-pad arrows / middle-click), so
-// main.rs's run_driver can force-release them at shutdown exactly like the
-// analog keys.
-static DPAD_HELD_TEST_KEYS: Mutex<Vec<VIRTUAL_KEY>> = Mutex::new(Vec::new());
-
 // Interception device index -> is-Tartarus verdict cache. Unlike the old Raw
 // Input hDevice (which Windows could recycle across an unplug, requiring an
 // explicit WM_INPUT_DEVICE_CHANGE cache-clear), Interception's device
@@ -186,31 +169,6 @@ static DPAD_HELD_TEST_KEYS: Mutex<Vec<VIRTUAL_KEY>> = Mutex::new(Vec::new());
 // session, so no invalidation logic is needed here.
 static DPAD_DEVICE_CACHE: LazyLock<Mutex<HashMap<Device, bool>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
-
-fn dpad_send_test_key(vk: VIRTUAL_KEY, key_up: bool) {
-    send_key(vk, key_up);
-    let Ok(mut held) = DPAD_HELD_TEST_KEYS.lock() else {
-        return;
-    };
-    if key_up {
-        held.retain(|k| *k != vk);
-    } else if !held.contains(&vk) {
-        held.push(vk);
-    }
-}
-
-// Shutdown safety: force-release any remapped D-pad/middle-click key still
-// logically held so we never leave a stuck key on the OS (mirrors the analog
-// force-release at the end of run_driver in main.rs).
-pub fn release_held_dpad_test_keys() {
-    let held: Vec<VIRTUAL_KEY> = match DPAD_HELD_TEST_KEYS.lock() {
-        Ok(mut h) => h.drain(..).collect(),
-        Err(_) => return,
-    };
-    for vk in held {
-        send_key(vk, true);
-    }
-}
 
 // Resolve (and cache) whether an Interception device index is the Tartarus.
 // Any lookup failure -> false (fail open) and NOT cached, so a transient
@@ -263,10 +221,10 @@ fn interception_device_is_tartarus(ctx: &Interception, device: Device) -> bool {
 }
 
 // Handles one received keyboard stroke. Confirmed-Tartarus arrow strokes are
-// suppressed (never forwarded) and remapped to the placeholder test key via
-// the existing SendInput-based helper; a confirmed-Tartarus Alt press/
-// release (the Hyper Response / Hypershift trigger) is suppressed and routed
-// through hypershift::on_trigger_edge (which layer/key it produces depends on
+// suppressed (never forwarded) and remapped via remap::on_dpad_arrow; a
+// confirmed-Tartarus Alt press/release (the Hyper Response / Hypershift
+// trigger) is suppressed and routed through remap::on_hyper_response ->
+// hypershift::on_trigger_edge (which layer/key it produces depends on
 // config.toml's [hypershift] — see hypershift.rs); everything else —
 // non-arrow/non-Alt keys, plain (non-E0) numpad presses, and ANY event from a
 // device that is not a positively-identified Tartarus — is forwarded
@@ -293,44 +251,34 @@ fn handle_interception_keyboard(
     state: KeyState,
     information: u32,
     from_tartarus: bool,
-    dpad: &DpadKeymap,
 ) {
     let raw_code = code as u16;
 
     if from_tartarus && raw_code == SCANCODE_ALT {
-        let key_down = !state.contains(KeyState::UP);
-        println!(
-            "[dpad] Tartarus Hyper Response (Alt) {} edge detected",
-            if key_down { "DOWN" } else { "UP  " }
-        );
-        crate::hypershift::on_trigger_edge(key_down);
         // Original stroke intentionally NOT forwarded: suppressed at the
         // driver, exactly like the D-pad arrows below — the trigger key's
         // own keycode never reaches the OS (docs/DESIGN.md §6② requirement).
+        remap::on_hyper_response(!state.contains(KeyState::UP));
         return;
     }
 
-    let is_arrow = state.contains(KeyState::E0) && dpad_arrow_test_key_for(raw_code, dpad).is_some();
-    if !is_arrow || !from_tartarus {
-        ctx.send(
-            device,
-            &[Stroke::Keyboard {
-                code,
-                state,
-                information,
-            }],
-        );
-        return;
+    let arrow = if state.contains(KeyState::E0) { dpad_arrow_direction_for(raw_code) } else { None };
+    match arrow {
+        Some(dir) if from_tartarus => {
+            // Original stroke intentionally NOT forwarded: suppressed at the driver.
+            remap::on_dpad_arrow(dir, state.contains(KeyState::UP));
+        }
+        _ => {
+            ctx.send(
+                device,
+                &[Stroke::Keyboard {
+                    code,
+                    state,
+                    information,
+                }],
+            );
+        }
     }
-    let key_up = state.contains(KeyState::UP);
-    let mapped = dpad_arrow_test_key_for(raw_code, dpad).expect("is_arrow checked this above");
-    dpad_send_test_key(mapped, key_up);
-    println!(
-        "[dpad] Tartarus D-pad arrow scancode={raw_code:#04x} {} -> test key vk={:#04x}",
-        if key_up { "UP  " } else { "DOWN" },
-        mapped.0
-    );
-    // Original stroke intentionally NOT forwarded: suppressed at the driver.
 }
 
 // Handles one received mouse stroke (wheel or middle button, per the filter
@@ -347,7 +295,6 @@ fn handle_interception_mouse(
     y: i32,
     information: u32,
     from_tartarus: bool,
-    dpad: &DpadKeymap,
 ) {
     if !from_tartarus {
         ctx.send(
@@ -364,28 +311,13 @@ fn handle_interception_mouse(
         return;
     }
     if state.contains(MouseState::WHEEL) {
-        let mapped = if rolling >= 0 { dpad.wheel_up } else { dpad.wheel_down };
-        // One key tap (down + up) per wheel notch.
-        send_key(mapped, false);
-        send_key(mapped, true);
-        println!(
-            "[dpad] Tartarus wheel rolling={rolling} -> test key vk={:#04x} tap",
-            mapped.0
-        );
+        remap::on_wheel(rolling as i32);
     }
     if state.contains(MouseState::MIDDLE_BUTTON_DOWN) {
-        dpad_send_test_key(dpad.middle_click, false);
-        println!(
-            "[dpad] Tartarus middle DOWN -> test key vk={:#04x}",
-            dpad.middle_click.0
-        );
+        remap::on_middle(false);
     }
     if state.contains(MouseState::MIDDLE_BUTTON_UP) {
-        dpad_send_test_key(dpad.middle_click, true);
-        println!(
-            "[dpad] Tartarus middle UP   -> test key vk={:#04x}",
-            dpad.middle_click.0
-        );
+        remap::on_middle(true);
     }
     // Original stroke intentionally NOT forwarded: suppressed at the driver.
 }
@@ -473,16 +405,10 @@ fn run_interception_thread() {
     );
     println!(
         "Interception driver initialized: D-pad/wheel/middle-click remap + device-aware \
-         Hypershift running (Tartarus D-pad -> {}/{}/{}/{}, wheel -> {}/{}, middle-click -> {}). \
+         Hypershift running ({}). \
          A real keyboard's Alt is never touched (fixed 2026-07-21 — see dpad.rs's \
          handle_interception_keyboard for why this used to block real Alt+Tab).",
-        vkname::vk_to_name(cfg().dpad.left),
-        vkname::vk_to_name(cfg().dpad.up),
-        vkname::vk_to_name(cfg().dpad.right),
-        vkname::vk_to_name(cfg().dpad.down),
-        vkname::vk_to_name(cfg().dpad.wheel_up),
-        vkname::vk_to_name(cfg().dpad.wheel_down),
-        vkname::vk_to_name(cfg().dpad.middle_click),
+        remap::describe_assignments(),
     );
 
     // Placeholder stroke, overwritten in place by ctx.receive() below.
@@ -500,13 +426,12 @@ fn run_interception_thread() {
             continue;
         }
         let from_tartarus = interception_device_is_tartarus(&ctx, device);
-        let dpad = &cfg().dpad;
         match strokes[0] {
             Stroke::Keyboard {
                 code,
                 state,
                 information,
-            } => handle_interception_keyboard(&ctx, device, code, state, information, from_tartarus, dpad),
+            } => handle_interception_keyboard(&ctx, device, code, state, information, from_tartarus),
             Stroke::Mouse {
                 state,
                 flags,
@@ -524,7 +449,6 @@ fn run_interception_thread() {
                 y,
                 information,
                 from_tartarus,
-                dpad,
             ),
         }
     }
@@ -547,32 +471,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn arrow_scancodes_map_to_the_expected_test_keys() {
-        let dpad = crate::config::DriverConfig::defaults().dpad;
-        assert_eq!(
-            dpad_arrow_test_key_for(SCANCODE_LEFT, &dpad),
-            Some(DPAD_ARROW_TEST_KEYMAP_LEFT)
-        );
-        assert_eq!(
-            dpad_arrow_test_key_for(SCANCODE_UP, &dpad),
-            Some(DPAD_ARROW_TEST_KEYMAP_UP)
-        );
-        assert_eq!(
-            dpad_arrow_test_key_for(SCANCODE_RIGHT, &dpad),
-            Some(DPAD_ARROW_TEST_KEYMAP_RIGHT)
-        );
-        assert_eq!(
-            dpad_arrow_test_key_for(SCANCODE_DOWN, &dpad),
-            Some(DPAD_ARROW_TEST_KEYMAP_DOWN)
-        );
+    fn arrow_scancodes_map_to_the_expected_directions() {
+        assert_eq!(dpad_arrow_direction_for(SCANCODE_LEFT), Some(DpadDirection::Left));
+        assert_eq!(dpad_arrow_direction_for(SCANCODE_UP), Some(DpadDirection::Up));
+        assert_eq!(dpad_arrow_direction_for(SCANCODE_RIGHT), Some(DpadDirection::Right));
+        assert_eq!(dpad_arrow_direction_for(SCANCODE_DOWN), Some(DpadDirection::Down));
     }
 
     #[test]
     fn non_arrow_scancodes_are_not_mapped() {
         // ScanCode::A, an ordinary letter key — never an arrow under any flag
         // combination, so callers must fail open (forward unmodified).
-        let dpad = crate::config::DriverConfig::defaults().dpad;
-        assert_eq!(dpad_arrow_test_key_for(ScanCode::A as u16, &dpad), None);
+        assert_eq!(dpad_arrow_direction_for(ScanCode::A as u16), None);
     }
 
     #[test]

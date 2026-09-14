@@ -10,6 +10,21 @@ description = "Standalone Rust driver for the Razer Tartarus Pro, no Synapse req
 # HIDデバイスと生パケット通信をするため
 hidapi = "2.6.0"
 
+# 設定ファイル(config.toml)の読み込み・保存用
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+
+# `configui` サブコマンド(ローカルWeb設定画面)用。非同期ランタイム不要の
+# 最小構成の同期HTTPサーバー。
+tiny_http = "0.12"
+serde_json = "1.0"
+
+# ---------------------------------------------------------------------------
+# OS-specific backends (see src/platform/mod.rs). Windows keeps the original
+# dependency set exactly; everything else gets only what its backend needs.
+# ---------------------------------------------------------------------------
+
+[target.'cfg(windows)'.dependencies]
 # Win32 API (SendInput / WH_KEYBOARD_LL フック[Hypershift用]) を安全かつ直に叩くため
 windows = { version = "0.58.0", features = [
     "Win32_Graphics_Gdi",
@@ -29,11 +44,15 @@ windows = { version = "0.58.0", features = [
 # build.rs で /DELAYLOAD 指定している。
 interception = "0.1.2"
 
-# 設定ファイル(config.toml)の読み込み・保存用
-serde = { version = "1.0", features = ["derive"] }
-toml = "0.8"
+[target.'cfg(not(windows))'.dependencies]
+# SIGINT/SIGTERM/SIGHUP -> the same SHUTDOWN_REQUESTED flag the Windows
+# console ctrl handler sets, so the stuck-key cleanup runs on every OS.
+ctrlc = { version = "3.4", features = ["termination"] }
 
-# `configui` サブコマンド(ローカルWeb設定画面)用。非同期ランタイム不要の
-# 最小構成の同期HTTPサーバー。
-tiny_http = "0.12"
-serde_json = "1.0"
+[target.'cfg(target_os = "macos")'.dependencies]
+# macOS hidapi opens every device exclusively (seized) by default; the
+# analog interface must be shared so `configui`'s calibration reader in a
+# second process still sees reports (docs/MACOS_PORT_PLAN.md). The
+# interfaces that DO need seizing are toggled explicitly in the macOS
+# backend.
+hidapi = { version = "2.6.0", features = ["macos-shared-device"] }

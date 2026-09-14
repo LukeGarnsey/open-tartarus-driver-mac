@@ -6,11 +6,10 @@
 
 use super::{build_effect, Actuation, ConfiguiSettings, DriverConfig, HypershiftConfig, HypershiftMode, SwitchStyle};
 use crate::lighting::{LayerIndicatorConfig, LightingConfig, ProfileLedColor};
-use crate::vkname::vk_from_name;
+use crate::key::Key;
 use crate::{eprintln, println, NUM_KEYS};
 use serde::Deserialize;
 use std::collections::HashMap;
-use windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY;
 
 #[derive(Deserialize, Default)]
 struct RawKeys {
@@ -92,30 +91,42 @@ struct RawConfig {
     configui: Option<RawConfigui>,
 }
 
-fn apply_analog_map(target: &mut [VIRTUAL_KEY; NUM_KEYS], provided: &HashMap<String, String>, section: &str) {
+fn apply_analog_map(target: &mut [Key; NUM_KEYS], provided: &HashMap<String, String>, section: &str) {
     for (i, vk_slot) in target.iter_mut().enumerate() {
         let key_name = format!("key{:02}", i + 1);
         let Some(name) = provided.get(&key_name) else {
             continue;
         };
-        match vk_from_name(name) {
+        match Key::from_name(name) {
             Some(vk) => *vk_slot = vk,
             None => eprintln!(
-                "WARNING: config.toml [{section}] {key_name} = \"{name}\" is not a recognized \
-                 key name; keeping the built-in default for this key."
+                "WARNING: config.toml [{section}] {key_name} = \"{name}\" {}; keeping the \
+                 built-in default for this key.",
+                rejection_reason(name)
             ),
         }
     }
 }
 
-fn apply_single(target: &mut VIRTUAL_KEY, provided: &Option<String>, field: &str) {
+fn apply_single(target: &mut Key, provided: &Option<String>, field: &str) {
     let Some(name) = provided else { return };
-    match vk_from_name(name) {
+    match Key::from_name(name) {
         Some(vk) => *target = vk,
         None => eprintln!(
-            "WARNING: config.toml {field} = \"{name}\" is not a recognized key name; keeping \
-             the built-in default."
+            "WARNING: config.toml {field} = \"{name}\" {}; keeping the built-in default.",
+            rejection_reason(name)
         ),
+    }
+}
+
+// Why Key::from_name rejected a name: a config.toml written on Windows can
+// legitimately name keys macOS has no equivalent for (F21-F24, MEDIA_STOP),
+// which deserves a different message than a typo.
+fn rejection_reason(name: &str) -> &'static str {
+    if Key::lookup(name).is_some() {
+        "is not available on this OS"
+    } else {
+        "is not a recognized key name"
     }
 }
 
@@ -156,11 +167,12 @@ fn apply_hypershift(target: &mut HypershiftConfig, provided: &Option<RawHypershi
         }
     }
     if let Some(name) = &raw.modifier_key {
-        match vk_from_name(name) {
+        match Key::from_name(name) {
             Some(vk) => target.modifier_key = vk,
             None => eprintln!(
-                "WARNING: config.toml [hypershift] modifier_key = \"{name}\" is not a recognized \
-                 key name; keeping the default (\"LALT\")."
+                "WARNING: config.toml [hypershift] modifier_key = \"{name}\" {}; keeping the \
+                 default (\"LALT\").",
+                rejection_reason(name)
             ),
         }
     }
@@ -370,7 +382,6 @@ fn try_reload_from(path: &std::path::Path) -> Option<DriverConfig> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use windows::Win32::UI::Input::KeyboardAndMouse::VK_LMENU;
 
     // try_reload_from() (not try_reload()/load(), which always resolve
     // crate::config_path() — the real, user-editable config.toml) is what
@@ -410,7 +421,7 @@ mod tests {
             mode: HypershiftMode::LayerSwitch,
             switch_style: SwitchStyle::Momentary,
             layer_count: 2,
-            modifier_key: VK_LMENU,
+            modifier_key: Key::LAlt,
         };
         let bad = Some(RawHypershift {
             mode: Some("not_a_mode".to_string()),
@@ -422,7 +433,7 @@ mod tests {
         assert!(matches!(hs.mode, HypershiftMode::LayerSwitch));
         assert!(matches!(hs.switch_style, SwitchStyle::Momentary));
         assert_eq!(hs.layer_count, 2);
-        assert_eq!(hs.modifier_key, VK_LMENU);
+        assert_eq!(hs.modifier_key, Key::LAlt);
 
         let good = Some(RawHypershift {
             mode: Some("modifier_key".to_string()),
@@ -434,7 +445,7 @@ mod tests {
         assert!(matches!(hs.mode, HypershiftMode::ModifierKey));
         assert!(matches!(hs.switch_style, SwitchStyle::Toggle));
         assert_eq!(hs.layer_count, 3);
-        assert_eq!(hs.modifier_key, vk_from_name("LCTRL").unwrap());
+        assert_eq!(hs.modifier_key, Key::LCtrl);
     }
 
     #[test]

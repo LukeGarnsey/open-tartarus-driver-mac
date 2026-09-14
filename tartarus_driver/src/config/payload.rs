@@ -5,7 +5,7 @@
 
 use super::{build_effect, DriverConfig};
 use crate::lighting::{Effect, LightingConfig, ProfileLedColor, WaveDirection};
-use crate::vkname::{vk_from_name, vk_to_name};
+use crate::key::Key;
 use crate::NUM_KEYS;
 use serde::{Deserialize, Serialize};
 
@@ -73,20 +73,20 @@ impl ConfigPayload {
         let (lighting_effect, lighting_color, lighting_brightness, lighting_wave_direction, lighting_reactive_speed) =
             lighting_to_payload_fields(&cfg.lighting);
         ConfigPayload {
-            keys_default: cfg.analog.layers[0].iter().map(|vk| vk_to_name(*vk)).collect(),
-            keys_layer1: cfg.analog.layers[1].iter().map(|vk| vk_to_name(*vk)).collect(),
-            keys_layer2: cfg.analog.layers[2].iter().map(|vk| vk_to_name(*vk)).collect(),
+            keys_default: cfg.analog.layers[0].iter().map(|vk| vk.name().to_string()).collect(),
+            keys_layer1: cfg.analog.layers[1].iter().map(|vk| vk.name().to_string()).collect(),
+            keys_layer2: cfg.analog.layers[2].iter().map(|vk| vk.name().to_string()).collect(),
             hypershift_mode: cfg.hypershift.mode.as_str().to_string(),
             hypershift_switch_style: cfg.hypershift.switch_style.as_str().to_string(),
             hypershift_layer_count: cfg.hypershift.layer_count,
-            hypershift_modifier_key: vk_to_name(cfg.hypershift.modifier_key),
-            dpad_left: vk_to_name(cfg.dpad.left),
-            dpad_up: vk_to_name(cfg.dpad.up),
-            dpad_right: vk_to_name(cfg.dpad.right),
-            dpad_down: vk_to_name(cfg.dpad.down),
-            wheel_up: vk_to_name(cfg.dpad.wheel_up),
-            wheel_down: vk_to_name(cfg.dpad.wheel_down),
-            middle_click: vk_to_name(cfg.dpad.middle_click),
+            hypershift_modifier_key: cfg.hypershift.modifier_key.name().to_string(),
+            dpad_left: cfg.dpad.left.name().to_string(),
+            dpad_up: cfg.dpad.up.name().to_string(),
+            dpad_right: cfg.dpad.right.name().to_string(),
+            dpad_down: cfg.dpad.down.name().to_string(),
+            wheel_up: cfg.dpad.wheel_up.name().to_string(),
+            wheel_down: cfg.dpad.wheel_down.name().to_string(),
+            middle_click: cfg.dpad.middle_click.name().to_string(),
             t_on: cfg.actuation.t_on,
             t_off: cfg.actuation.t_off,
             per_key_t_on: cfg.actuation.per_key.iter().map(|p| p.map(|(on, _)| on)).collect(),
@@ -123,7 +123,7 @@ impl ConfigPayload {
         }
 
         let check = |label: String, name: &str| -> Result<(), String> {
-            if vk_from_name(name).is_some() {
+            if Key::from_name(name).is_some() {
                 Ok(())
             } else {
                 Err(format!("{label}: \"{name}\" は認識できないキー名です"))
@@ -287,7 +287,7 @@ mod tests {
         assert!(matches!(cfg.hypershift.mode, crate::config::HypershiftMode::LayerSwitch));
         assert!(matches!(cfg.hypershift.switch_style, crate::config::SwitchStyle::Momentary));
         assert_eq!(cfg.hypershift.layer_count, 2);
-        assert_eq!(cfg.hypershift.modifier_key, windows::Win32::UI::Input::KeyboardAndMouse::VK_LMENU);
+        assert_eq!(cfg.hypershift.modifier_key, Key::LAlt);
         let payload = ConfigPayload::from_driver_config(&cfg);
         assert_eq!(payload.hypershift_mode, "layer_switch");
         assert_eq!(payload.hypershift_switch_style, "momentary");

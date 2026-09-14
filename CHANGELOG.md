@@ -7,6 +7,12 @@
 <a name="english"></a>
 ## English
 
+### Unreleased (macOS port, `macos-port` branch)
+
+- **Changed (internal)**: all OS-specific code now sits behind `src/platform/` (Windows: the original SendInput / Win32 / Interception code, unchanged in behaviour) and keys are represented by a platform-neutral `Key` type (`src/key.rs`, one table holding the name, Windows VK and macOS keycode for every key) instead of the Win32 `VIRTUAL_KEY`. The D-pad/wheel/middle-click/Hyper Response emit logic moved from `dpad.rs` into OS-neutral `src/remap.rs`; `dpad.rs` is now just the Windows/Interception shell around it. The crate builds on Linux/macOS with a logging-only backend (no key emission yet).
+- **Added**: `LCMD`/`RCMD` key names (the Windows keys on Windows, Command on macOS).
+- **Added**: `.github/workflows/ci.yml` — build + test on Windows, macOS and Linux for every push.
+
 ### v1.0.7
 
 - **Fixed**: mapping a key to `LSHIFT`/`RSHIFT`/`LCTRL`/`RCTRL`/`LALT`/`RALT` could be misread by games that read raw scan codes instead of virtual-key codes — confirmed on real hardware: `LSHIFT` arrived in Valorant as `RSHIFT`, and `RSHIFT` didn't register at all. These six keys now send the correct hardware scan code explicitly instead of relying on Windows' own (unreliable, for this specific left/right pair) translation. Every other key is unaffected.

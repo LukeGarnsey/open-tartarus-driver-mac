@@ -11,7 +11,7 @@
 // own within about a second (v1.0.6 hot-reload, main.rs's run_driver loop).
 
 use crate::config::{ConfigPayload, DriverConfig};
-use crate::vkname::key_names_grouped;
+use crate::key::key_names_grouped;
 use crate::{eprintln, println, NUM_KEYS};
 use serde::{Deserialize, Serialize};
 use std::io::Read as _;
@@ -24,7 +24,7 @@ const PORT: u16 = 7878;
 const ASSET_HTML: &str = include_str!("../assets/configui.html");
 
 // Body of GET /api/key-options — the two categories configui.html's key
-// picker offers (v1.0.5). Split at the source (vkname::key_names_grouped())
+// picker offers (v1.0.5). Split at the source (key::key_names_grouped())
 // rather than the page inferring category from name shape, so the page's
 // vocabulary can never drift from what the driver actually accepts.
 #[derive(Serialize)]

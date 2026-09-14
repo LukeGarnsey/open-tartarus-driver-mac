@@ -117,7 +117,7 @@ Copy `config.example.toml` to `config.toml` and edit the values. Valid key names
 - Single letters: `"A"`–`"Z"`
 - Function keys: `"F1"`–`"F24"`
 - D-pad directions: `"LEFT"` / `"UP"` / `"RIGHT"` / `"DOWN"`
-- Others: `"SPACE"` `"ENTER"` `"TAB"` `"ESCAPE"` `"BACKSPACE"` `"LSHIFT"` `"RSHIFT"` `"LCTRL"` `"RCTRL"` `"LALT"` `"RALT"` `"HOME"` `"END"` `"PAGEUP"` `"PAGEDOWN"` `"INSERT"` `"DELETE"`
+- Others: `"SPACE"` `"ENTER"` `"TAB"` `"ESCAPE"` `"BACKSPACE"` `"LSHIFT"` `"RSHIFT"` `"LCTRL"` `"RCTRL"` `"LALT"` `"RALT"` `"LCMD"` `"RCMD"` `"HOME"` `"END"` `"PAGEUP"` `"PAGEDOWN"` `"INSERT"` `"DELETE"` (`LCMD`/`RCMD` = the Windows keys on Windows, Command on macOS)
 
 An unrecognized key name falls back to the built-in default for that one key, with a warning in `logs/run.log` (the driver never crashes over this).
 
@@ -296,7 +296,7 @@ cargo run --release -- configui
 - アルファベット1文字: `"A"`〜`"Z"`
 - ファンクションキー: `"F1"`〜`"F24"`
 - 十字キー用: `"LEFT"` / `"UP"` / `"RIGHT"` / `"DOWN"`
-- その他: `"SPACE"` `"ENTER"` `"TAB"` `"ESCAPE"` `"BACKSPACE"` `"LSHIFT"` `"RSHIFT"` `"LCTRL"` `"RCTRL"` `"LALT"` `"RALT"` `"HOME"` `"END"` `"PAGEUP"` `"PAGEDOWN"` `"INSERT"` `"DELETE"`
+- その他: `"SPACE"` `"ENTER"` `"TAB"` `"ESCAPE"` `"BACKSPACE"` `"LSHIFT"` `"RSHIFT"` `"LCTRL"` `"RCTRL"` `"LALT"` `"RALT"` `"LCMD"` `"RCMD"` `"HOME"` `"END"` `"PAGEUP"` `"PAGEDOWN"` `"INSERT"` `"DELETE"`(`LCMD`/`RCMD` = WindowsではWindowsキー、macOSではCommandキー)
 
 存在しないキー名を書いた場合、そのキーだけビルトインの既定値にフォールバックし、`logs/run.log`に警告が出る(ドライバが落ちることはない)。
 

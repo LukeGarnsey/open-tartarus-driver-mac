@@ -23,15 +23,8 @@
 //     layer switching at all.
 
 use crate::config::{HypershiftMode, SwitchStyle};
-use crate::{eprintln, println};
+use crate::println;
 use std::sync::atomic::{AtomicU8, Ordering};
-use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
-use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::Input::KeyboardAndMouse::{VK_LMENU, VK_MENU, VK_RMENU};
-use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, TranslateMessage, HC_ACTION,
-    KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
-};
 
 // The active Hyper Shift layer (0 = Default, 1 = Layer1, 2 = Layer2), always
 // < main.rs::MAX_LAYERS. Only meaningful/updated when [hypershift] mode =
@@ -72,7 +65,7 @@ pub(crate) fn on_trigger_edge_with(pressed: bool, hs: &crate::config::Hypershift
             println!(
                 "[hypershift] Hyper Response {} -> sent {} (modifier_key mode)",
                 if pressed { "DOWN" } else { "UP  " },
-                crate::vkname::vk_to_name(hs.modifier_key)
+                hs.modifier_key.name()
             );
         }
         HypershiftMode::LayerSwitch => match hs.switch_style {
@@ -98,60 +91,82 @@ pub(crate) fn on_trigger_edge_with(pressed: bool, hs: &crate::config::Hypershift
     }
 }
 
-// Low-level keyboard hook procedure. Runs on the hook thread's message pump.
-// Only Alt (VK_MENU / VK_LMENU / VK_RMENU) is intercepted; every other key is
-// passed through untouched via CallNextHookEx. Returning a non-zero LRESULT
-// without calling CallNextHookEx swallows the Alt event system-wide — this
-// hook is only ever active when Interception (which CAN tell the Tartarus's
-// Alt apart from a real keyboard's) isn't available, so blocking every
-// keyboard's Alt here is a known, documented limitation of this fallback
-// path only (see dpad.rs's fall_back_to_hook_based_hypershift).
-unsafe extern "system" fn hypershift_hook_proc(
-    code: i32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    if code == HC_ACTION as i32 {
-        let event = unsafe { &*(lparam.0 as *const KBDLLHOOKSTRUCT) };
-        let vk = event.vkCode as u16;
-        if vk == VK_MENU.0 || vk == VK_LMENU.0 || vk == VK_RMENU.0 {
-            match wparam.0 as u32 {
-                WM_KEYDOWN | WM_SYSKEYDOWN => on_trigger_edge(true),
-                WM_KEYUP | WM_SYSKEYUP => on_trigger_edge(false),
-                _ => {}
+// ---------------------------------------------------------------------------
+// Windows-only fallback: WH_KEYBOARD_LL hook (used when Interception isn't
+// installed — see dpad.rs's fall_back_to_hook_based_hypershift). macOS has
+// no equivalent and needs none: its backend reads the Tartarus's own boot
+// keyboard interface directly, which is inherently device-aware.
+// ---------------------------------------------------------------------------
+#[cfg(windows)]
+mod hook {
+    use super::on_trigger_edge;
+    use crate::{eprintln, println};
+    use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
+    use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+    use windows::Win32::UI::Input::KeyboardAndMouse::{VK_LMENU, VK_MENU, VK_RMENU};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, TranslateMessage, HC_ACTION,
+        KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
+    };
+
+    // Low-level keyboard hook procedure. Runs on the hook thread's message pump.
+    // Only Alt (VK_MENU / VK_LMENU / VK_RMENU) is intercepted; every other key is
+    // passed through untouched via CallNextHookEx. Returning a non-zero LRESULT
+    // without calling CallNextHookEx swallows the Alt event system-wide — this
+    // hook is only ever active when Interception (which CAN tell the Tartarus's
+    // Alt apart from a real keyboard's) isn't available, so blocking every
+    // keyboard's Alt here is a known, documented limitation of this fallback
+    // path only (see dpad.rs's fall_back_to_hook_based_hypershift).
+    unsafe extern "system" fn hypershift_hook_proc(
+        code: i32,
+        wparam: WPARAM,
+        lparam: LPARAM,
+    ) -> LRESULT {
+        if code == HC_ACTION as i32 {
+            let event = unsafe { &*(lparam.0 as *const KBDLLHOOKSTRUCT) };
+            let vk = event.vkCode as u16;
+            if vk == VK_MENU.0 || vk == VK_LMENU.0 || vk == VK_RMENU.0 {
+                match wparam.0 as u32 {
+                    WM_KEYDOWN | WM_SYSKEYDOWN => on_trigger_edge(true),
+                    WM_KEYUP | WM_SYSKEYUP => on_trigger_edge(false),
+                    _ => {}
+                }
+                return LRESULT(1); // block the trigger key from reaching the OS
             }
-            return LRESULT(1); // block the trigger key from reaching the OS
         }
+        unsafe { CallNextHookEx(None, code, wparam, lparam) }
     }
-    unsafe { CallNextHookEx(None, code, wparam, lparam) }
+
+    // Installs the WH_KEYBOARD_LL hook on a dedicated thread with its own message
+    // pump (SetWindowsHookExW requires a live GetMessage loop on the installing
+    // thread). This is a separate thread from the analog HID read loop, which is
+    // fine: it only touches Win32 hook APIs, never a HidDevice handle, so the
+    // documented "HID reads silently return nothing from a non-opening thread"
+    // restriction does not apply here. The thread runs for the process lifetime;
+    // Windows removes the hook automatically when the process exits.
+    pub fn spawn_hypershift_hook_thread() {
+        std::thread::spawn(|| unsafe {
+            let hinstance = GetModuleHandleW(None)
+                .map(|module| HINSTANCE(module.0))
+                .unwrap_or_default();
+            match SetWindowsHookExW(WH_KEYBOARD_LL, Some(hypershift_hook_proc), hinstance, 0) {
+                Ok(_hook) => println!(
+                    "Hypershift hook installed: Alt (Hyper Response button) is now blocked from other \
+                     apps and routed through on_trigger_edge (see config.toml's [hypershift])."
+                ),
+                Err(e) => {
+                    eprintln!("WARNING: failed to install WH_KEYBOARD_LL hook: {e} (Hypershift disabled)");
+                    return;
+                }
+            }
+            let mut msg = MSG::default();
+            while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+                let _ = TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        });
+    }
 }
 
-// Installs the WH_KEYBOARD_LL hook on a dedicated thread with its own message
-// pump (SetWindowsHookExW requires a live GetMessage loop on the installing
-// thread). This is a separate thread from the analog HID read loop, which is
-// fine: it only touches Win32 hook APIs, never a HidDevice handle, so the
-// documented "HID reads silently return nothing from a non-opening thread"
-// restriction does not apply here. The thread runs for the process lifetime;
-// Windows removes the hook automatically when the process exits.
-pub fn spawn_hypershift_hook_thread() {
-    std::thread::spawn(|| unsafe {
-        let hinstance = GetModuleHandleW(None)
-            .map(|module| HINSTANCE(module.0))
-            .unwrap_or_default();
-        match SetWindowsHookExW(WH_KEYBOARD_LL, Some(hypershift_hook_proc), hinstance, 0) {
-            Ok(_hook) => println!(
-                "Hypershift hook installed: Alt (Hyper Response button) is now blocked from other \
-                 apps and routed through on_trigger_edge (see config.toml's [hypershift])."
-            ),
-            Err(e) => {
-                eprintln!("WARNING: failed to install WH_KEYBOARD_LL hook: {e} (Hypershift disabled)");
-                return;
-            }
-        }
-        let mut msg = MSG::default();
-        while GetMessageW(&mut msg, None, 0, 0).as_bool() {
-            let _ = TranslateMessage(&msg);
-            DispatchMessageW(&msg);
-        }
-    });
-}
+#[cfg(windows)]
+pub use hook::spawn_hypershift_hook_thread;

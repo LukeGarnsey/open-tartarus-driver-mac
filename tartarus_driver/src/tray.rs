@@ -23,14 +23,13 @@ use windows::core::PCWSTR;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Shell::{
-    ShellExecuteW, Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE,
-    NOTIFYICONDATAW,
+    Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NOTIFYICONDATAW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyWindow,
     DispatchMessageW, GetCursorPos, GetMessageW, LoadIconW, PostQuitMessage, RegisterClassExW,
     SetForegroundWindow, TrackPopupMenu, TranslateMessage, HICON, IDI_APPLICATION, MF_DISABLED,
-    MF_GRAYED, MF_SEPARATOR, MF_STRING, MSG, SW_SHOWNORMAL, TPM_LEFTALIGN, TPM_RIGHTBUTTON,
+    MF_GRAYED, MF_SEPARATOR, MF_STRING, MSG, TPM_LEFTALIGN, TPM_RIGHTBUTTON,
     WM_APP, WM_COMMAND, WM_DESTROY, WM_LBUTTONUP, WM_RBUTTONUP, WNDCLASSEXW, WS_OVERLAPPED,
 };
 
@@ -41,12 +40,6 @@ const IDM_VERSION: usize = 3;
 const IDM_CHECK_UPDATES: usize = 4;
 const TRAY_ICON_ID: u32 = 1;
 const CLASS_NAME: PCWSTR = w!("TartarusDriverTrayWindowClass");
-
-// Public repo's Releases page — where a newer version, if any, would be
-// published. This project has no auto-update check of its own (no telemetry,
-// no background network calls by design); this menu item just saves the user
-// from having to remember the URL.
-const RELEASES_URL: &str = "https://github.com/ultramonaka/open-tartarus-driver/releases";
 
 unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
@@ -119,19 +112,11 @@ fn show_context_menu(hwnd: HWND) {
 }
 
 fn open_settings_page() {
-    unsafe {
-        // Fire-and-forget: ShellExecuteW's return value here is an HINSTANCE
-        // (legacy ABI quirk), not worth inspecting — worst case the browser
-        // just doesn't open, which the user notices immediately.
-        let _ = ShellExecuteW(None, w!("open"), w!("http://127.0.0.1:7878/"), None, None, SW_SHOWNORMAL);
-    }
+    crate::platform::open_url(crate::CONFIGUI_URL);
 }
 
 fn open_releases_page() {
-    unsafe {
-        let url = to_wide(RELEASES_URL);
-        let _ = ShellExecuteW(None, w!("open"), PCWSTR(url.as_ptr()), None, None, SW_SHOWNORMAL);
-    }
+    crate::platform::open_url(crate::RELEASES_URL);
 }
 
 fn to_wide(s: &str) -> Vec<u16> {

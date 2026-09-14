@@ -14,12 +14,11 @@
 // one command at a time rather than re-polling a shared array continuously
 // — simpler, and behaviorally identical for what this tool is for.
 
-use crate::vkname::vk_to_name;
 use crate::{config, eprintln, println, NUM_KEYS};
 use std::io::BufRead;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
-use windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY;
+use crate::key::Key;
 
 fn print_help() {
     println!("Commands (Enter to run, Ctrl+C or \"quit\" to exit):");
@@ -39,9 +38,9 @@ fn parse_key_index(s: &str) -> Option<usize> {
     (1..=NUM_KEYS).contains(&n).then(|| n - 1)
 }
 
-fn report_key_state(idx: usize, pressed_vk: &[Option<VIRTUAL_KEY>; NUM_KEYS]) {
+fn report_key_state(idx: usize, pressed_vk: &[Option<Key>; NUM_KEYS]) {
     match pressed_vk[idx] {
-        Some(vk) => println!("[emulate] key{:02} is now DOWN -> sends \"{}\"", idx + 1, vk_to_name(vk)),
+        Some(vk) => println!("[emulate] key{:02} is now DOWN -> sends \"{}\"", idx + 1, vk.name()),
         None => println!("[emulate] key{:02} is now up", idx + 1),
     }
 }
@@ -57,7 +56,7 @@ fn report_key_state(idx: usize, pressed_vk: &[Option<VIRTUAL_KEY>; NUM_KEYS]) {
 // main.rs for why. Detailed logging of what the edge actually did (layer
 // changed vs. modifier key sent) comes from on_trigger_edge itself
 // (hypershift.rs), not duplicated here.
-fn fire_hyper_edge(pressed: bool, pressed_vk: &mut [Option<VIRTUAL_KEY>; NUM_KEYS], start: Instant) {
+fn fire_hyper_edge(pressed: bool, pressed_vk: &mut [Option<Key>; NUM_KEYS], start: Instant) {
     let before = crate::hypershift::CURRENT_LAYER.load(Ordering::SeqCst);
     crate::hypershift::on_trigger_edge(pressed);
     let after = crate::hypershift::CURRENT_LAYER.load(Ordering::SeqCst);
@@ -70,7 +69,7 @@ fn fire_hyper_edge(pressed: bool, pressed_vk: &mut [Option<VIRTUAL_KEY>; NUM_KEY
 fn handle_command(
     line: &str,
     depths: &mut [u8; NUM_KEYS],
-    pressed_vk: &mut [Option<VIRTUAL_KEY>; NUM_KEYS],
+    pressed_vk: &mut [Option<Key>; NUM_KEYS],
     start: Instant,
 ) -> bool {
     let line = line.trim();
@@ -140,7 +139,7 @@ pub fn run_emulator() {
 
     let start = Instant::now();
     let mut depths = [0u8; NUM_KEYS];
-    let mut pressed_vk: [Option<VIRTUAL_KEY>; NUM_KEYS] = [None; NUM_KEYS];
+    let mut pressed_vk: [Option<Key>; NUM_KEYS] = [None; NUM_KEYS];
 
     let stdin = std::io::stdin();
     for line in stdin.lock().lines() {
@@ -195,7 +194,7 @@ mod tests {
         crate::set_cfg(crate::config::DriverConfig::defaults());
         let start = Instant::now();
         let mut depths = [0u8; NUM_KEYS];
-        let mut pressed_vk: [Option<VIRTUAL_KEY>; NUM_KEYS] = [None; NUM_KEYS];
+        let mut pressed_vk: [Option<Key>; NUM_KEYS] = [None; NUM_KEYS];
 
         // Unrecognized/empty input doesn't panic and keeps the loop running.
         assert!(handle_command("bogus", &mut depths, &mut pressed_vk, start));
@@ -268,7 +267,7 @@ mod tests {
             mode: crate::config::HypershiftMode::LayerSwitch,
             switch_style: crate::config::SwitchStyle::Toggle,
             layer_count: 3,
-            modifier_key: crate::vkname::vk_from_name("LALT").unwrap(),
+            modifier_key: Key::LAlt,
         };
         for expected in [1u8, 2, 0, 1] {
             crate::hypershift::on_trigger_edge_with(true, &toggle3);
@@ -284,7 +283,7 @@ mod tests {
             mode: crate::config::HypershiftMode::ModifierKey,
             switch_style: crate::config::SwitchStyle::Momentary,
             layer_count: 2,
-            modifier_key: crate::vkname::vk_from_name("LALT").unwrap(),
+            modifier_key: Key::LAlt,
         };
         crate::hypershift::on_trigger_edge_with(true, &modifier);
         assert_eq!(crate::hypershift::CURRENT_LAYER.load(Ordering::SeqCst), 0);
