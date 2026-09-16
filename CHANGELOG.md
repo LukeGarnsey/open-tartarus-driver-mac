@@ -7,7 +7,7 @@
 <a name="english"></a>
 ## English
 
-### Unreleased (macOS port, `macos-port` branch)
+### v1.1.0 (macOS port)
 
 - **Added: macOS support** — the whole feature set on Apple Silicon and Intel Macs, verified on real hardware: analog keys with the same hysteresis/3-layer/hot-reload behaviour, all key names incl. modifiers (Option/Command as `LALT`/`RALT`/`LCMD`/`RCMD`), media/volume keys, LED lighting, the browser config page with live calibration, D-pad/wheel/middle-click remap and Hyper Shift, and a menu-bar icon for `tray` mode. No kernel driver: the D-pad/wheel remap works by seizing the keypad's own HID interfaces, which for the D-pad/thumb button needs the driver started with `sudo` (wheel/middle-click and everything else work without it). Two macOS permissions are prompted on first launch (Accessibility, Input Monitoring). `F21`–`F24` and `MEDIA_STOP` are not available on macOS. See `USAGE.md` section 9.
 - **Added**: `Tartarus Driver.app` — a universal, signed bundle built by `scripts/macos/make-app.sh` and published in the release zip. Double-clicking it starts `tray` mode; its `config.toml` and `logs/` live in `~/Library/Application Support/open-tartarus-driver/`. A LaunchAgent sample for start-at-login is included.
@@ -69,7 +69,7 @@ Initial public release.
 <a name="japanese"></a>
 ## 日本語
 
-### 未リリース (macOS移植、`macos-port`ブランチ)
+### v1.1.0 (macOS移植)
 
 - **追加: macOS対応** — Apple Silicon / Intel Macで全機能が動作(実機検証済み): 同じヒステリシス/3レイヤー/ホットリロード挙動のアナログキー、修飾キーを含む全キー名(Option/Commandは`LALT`/`RALT`/`LCMD`/`RCMD`)、メディア/音量キー、LEDライティング、ライブキャリブレーション付きブラウザ設定画面、十字キー/ホイール/中クリックのリマップとハイパーシフト、そして`tray`モード用のメニューバーアイコン。カーネルドライバは不要: 十字キー/ホイールのリマップはキーパッド自身のHIDインターフェースを独占取得する方式で、十字キー/サムボタンについてはドライバを`sudo`で起動する必要がある(ホイール/中クリックとその他の機能は`sudo`なしで動く)。初回起動時にmacOSの権限を2つ(アクセシビリティ、入力監視)求められる。`F21`〜`F24`と`MEDIA_STOP`はmacOSでは使えない。詳細は`USAGE.md`の9節。
 - **追加**: `Tartarus Driver.app` — `scripts/macos/make-app.sh`で生成する署名済みユニバーサルバンドル(リリースzipに同梱)。ダブルクリックで`tray`モード起動。`config.toml`と`logs/`は`~/Library/Application Support/open-tartarus-driver/`に置かれる。ログイン時自動起動用のLaunchAgentサンプルも同梱。
