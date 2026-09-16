@@ -126,6 +126,13 @@ pub fn open_url(url: &str) {
     }
 }
 
+// Windows needs no runtime permission for SendInput or HID reads.
+pub fn check_input_permissions() {}
+
+pub fn hid_open_hint(_err: &hidapi::HidError) -> Option<&'static str> {
+    None
+}
+
 // D-pad / wheel / middle-click remap + device-aware Hypershift via the
 // Interception kernel driver (see dpad.rs). Falls back internally to the
 // WH_KEYBOARD_LL hook when Interception isn't installed.

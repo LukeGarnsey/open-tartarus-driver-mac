@@ -21,9 +21,15 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
   (the OS seam), `src/remap.rs` (OS-neutral D-pad/wheel/middle/Hyper
   Response logic). `dpad.rs`, `tray.rs`, and the hook in `hypershift.rs`
   are `#[cfg(windows)]`.
-- **`src/platform/macos.rs` is a compiling skeleton**: `send_key` warns
-  once and types nothing; `spawn_input_capture` only checks for root.
-  Shutdown handler (ctrlc) and `open_url` are final.
+- **Phase 2 done (2026-09-16)**: `src/platform/macos.rs` emits for real —
+  hand-rolled CoreGraphics `CGEventPost` with `HELD_FLAGS` modifier
+  tracking (pure `next_flags()`, unit-tested) on a CombinedSessionState
+  source, `NSEvent` SystemDefined events via `objc2` `msg_send!` for
+  media keys, `check_input_permissions()` (Accessibility prompt),
+  `hid_open_hint()` (Input Monitoring hint), `bundle_app_root()` for
+  `.app` runs. `analog_device_infos()` picks `interface_number() == 1` on
+  macOS. All hardware-verified (list in the plan's Phase 2 block).
+  `spawn_input_capture` still only checks for root (Phase 3).
 - **Phase 0 done (2026-09-16)** on an Apple Silicon Mac with the keypad:
   `cargo build` + `cargo test` (41 pass) are green on macOS, and
   `examples/mac_probe.rs` verified every open question — results table and
@@ -33,8 +39,9 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
   `interface_number() == 1` on macOS; IF2 can be seized **without** root
   (only IF0 needs it); diagonal D-pad = two codes in the key array;
   CGEventPost + NSEvent media emission works; two shared IF1 readers work.
-- **Next: Phase 2** (`send_key` for real, `analog_device_infos` fix,
-  Accessibility prompt, `app_root()` bundle path), then Phase 3.
+- **Next: Phase 3** — seize IF0 (root) / IF2 (no root needed) in
+  `spawn_input_capture`, parse the 8-byte unnumbered reports, feed
+  `remap::*`; share the IF2 handle with lighting.
 - Windows regression check: `cargo check --tests --target x86_64-pc-windows-gnu`
   (done on Linux; no mingw on this Mac yet).
 
@@ -70,6 +77,10 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
   that (Phase 4).
 - `sudo cargo run` and plain `cargo run` have different `target/` ownership
   headaches — prefer `cargo build --release` then `sudo ./target/release/tartarus_driver`.
+- Hardware test recipe: `./target/release/tartarus_driver 60` (time-boxed)
+  from Terminal.app with TextEdit focused; write a throwaway `config.toml`
+  at the repo root mid-run to exercise hot reload (it's gitignored — delete
+  it afterwards); read `logs/run.log` for the DOWN/UP edges.
 - hidapi on macOS lists one `DeviceInfo` per (device, usage pair) with the
   same `path()`; `analog_device_infos()` already dedupes by path.
 - Report-ID framing differs from Windows: macOS only prepends the ID byte
@@ -96,7 +107,7 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
 
 ```
 cd tartarus_driver
-cargo build && cargo test            # any OS
+cargo build && cargo test            # any OS (46 tests)
 cargo run --release -- emulate       # hardware-free harness for the key pipeline
 cargo check --tests --target x86_64-pc-windows-gnu   # Windows regression check from Linux/mac (needs mingw + target)
 ```

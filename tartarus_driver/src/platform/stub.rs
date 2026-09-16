@@ -37,6 +37,12 @@ pub fn open_url(url: &str) {
     }
 }
 
+pub fn check_input_permissions() {}
+
+pub fn hid_open_hint(_err: &hidapi::HidError) -> Option<&'static str> {
+    None
+}
+
 pub fn spawn_input_capture() {
     eprintln!(
         "WARNING: D-pad/wheel/middle-click remap and Hyper Shift are not available on this \

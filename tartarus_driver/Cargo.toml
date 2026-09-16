@@ -57,8 +57,8 @@ ctrlc = { version = "3.4", features = ["termination"] }
 # backend.
 hidapi = { version = "2.6.0", features = ["macos-shared-device"] }
 
-[target.'cfg(target_os = "macos")'.dev-dependencies]
-# examples/mac_probe.rs (Phase 0 hardware spike, not shipped) posts NSEvent
-# SystemDefined events for media keys through raw `msg_send!`. Phase 2 may
-# promote this (or objc2-app-kit) to a real dependency.
+# Media/volume keys on macOS are NSEvent "system-defined" events, not
+# keyboard events; platform/macos.rs builds them with a raw `msg_send!`
+# (also used by examples/mac_probe.rs). Plain CoreGraphics key events are
+# hand-rolled `extern "C"` and need no crate.
 objc2 = "0.6"

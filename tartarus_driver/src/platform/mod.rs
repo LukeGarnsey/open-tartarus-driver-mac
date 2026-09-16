@@ -9,6 +9,12 @@
 //                              stuck-key cleanup still runs
 //   detach_console()           `tray` mode: drop the console window, if any
 //   open_url(url)              open a URL in the default browser (tray menu)
+//   check_input_permissions()  log (and on macOS, prompt for) whatever OS
+//                              permission synthetic input needs; no-op
+//                              where none is needed
+//   hid_open_hint(&err)        an extra, OS-specific sentence to log when a
+//                              HID open fails (macOS: the Input Monitoring
+//                              grant), or None
 //   spawn_input_capture()      start whatever this OS uses to intercept the
 //                              Tartarus's own D-pad/wheel/middle-click/
 //                              Hyper Response events (Windows: the
@@ -18,8 +24,9 @@
 //
 // Backends:
 //   windows.rs  the original, hardware-verified SendInput / Win32 code
-//   macos.rs    CoreGraphics/IOKit backend (in progress — see
-//               docs/MACOS_PORT_PLAN.md; currently a compiling skeleton)
+//   macos.rs    CoreGraphics/AppKit key emission (hardware-verified);
+//               D-pad/wheel/Hyper Shift capture still pending (see
+//               docs/MACOS_PORT_PLAN.md Phase 3)
 //   stub.rs     everything else (Linux dev boxes / CI): logs instead of
 //               emitting, so the pure logic + `cargo test` run anywhere
 

@@ -53,6 +53,13 @@ pub fn app_root() -> std::path::PathBuf {
         .ok()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()))
         .unwrap_or_else(|| std::path::PathBuf::from("."));
+    // macOS .app bundle: writing next to the exe would break the bundle's
+    // code signature, so use ~/Library/Application Support instead (see
+    // platform/macos.rs::bundle_app_root).
+    #[cfg(target_os = "macos")]
+    if let Some(root) = platform::bundle_app_root(&exe_dir) {
+        return root;
+    }
     let looks_like_build_profile_dir = exe_dir
         .file_name()
         .is_some_and(|n| n == "debug" || n == "release");
@@ -410,19 +417,28 @@ pub(crate) fn process_key_depths(
 // startup) and configui's try_open_analog_devices (which must fail soft
 // instead, since it runs inside the long-lived config web server).
 pub(crate) fn analog_device_infos(api: &HidApi) -> Vec<hidapi::DeviceInfo> {
-    let infos = api
+    let tartarus = api
         .device_list()
-        .filter(|d| d.vendor_id() == VID && d.product_id() == PID)
+        .filter(|d| d.vendor_id() == VID && d.product_id() == PID);
+    #[cfg(not(target_os = "macos"))]
+    let infos = tartarus
         .filter(|d| !(d.usage_page() == 0x0001 && (d.usage() == 0x0002 || d.usage() == 0x0006)))
         .cloned();
     // macOS: hidapi reports one entry per (IOHIDDevice, usage pair) rather
-    // than one per top-level collection, so a multi-usage interface shows
-    // up several times under the SAME path. Opening it once is enough (and
-    // opening it twice fails outright if the first open seized it).
+    // than one per top-level collection, so an interface shows up several
+    // times under the SAME path — and the usage filter above is the wrong
+    // tool here: verified 2026-09-16 (examples/mac_probe.rs) that Interface
+    // 1's FIRST entry is Keyboard usage (0x0001/0x0006) and that Interface
+    // 2 also has a 0x0001/0x0001 entry the filter would let through. hidapi
+    // does populate interface_number() on macOS, so select the analog
+    // interface by number and open it once.
     #[cfg(target_os = "macos")]
     let infos = {
         let mut seen = std::collections::HashSet::new();
-        infos.filter(move |d| seen.insert(d.path().to_owned()))
+        tartarus
+            .filter(|d| d.interface_number() == 1)
+            .filter(move |d| seen.insert(d.path().to_owned()))
+            .cloned()
     };
     infos.collect()
 }
@@ -456,6 +472,9 @@ fn open_analog_devices(api: &HidApi) -> Vec<(i32, hidapi::HidDevice)> {
                     "[if{}] failed to open (skipping): {e}",
                     info.interface_number()
                 );
+                if let Some(hint) = platform::hid_open_hint(&e) {
+                    eprintln!("  {hint}");
+                }
             }
         }
     }
@@ -477,6 +496,9 @@ fn open_razer_control_device(api: &HidApi) -> Option<hidapi::HidDevice> {
         Ok(d) => Some(d),
         Err(e) => {
             eprintln!("[razer] Interface 2 (Razer Control Device) open failed: {e}");
+            if let Some(hint) = platform::hid_open_hint(&e) {
+                eprintln!("  {hint}");
+            }
             None
         }
     }
@@ -577,6 +599,10 @@ fn run_tray_mode() {
 // the normal (console) invocation and `tray` mode. `duration_secs` is
 // ignored when `run_forever` is true.
 fn run_driver(run_forever: bool, duration_secs: u64) {
+    // Before touching the device: on macOS this triggers the Accessibility
+    // prompt and logs what to do if synthetic keys are being dropped.
+    platform::check_input_permissions();
+
     let api = HidApi::new().expect("hidapi init failed");
 
     // Reverse-engineered 2026-07-18 (see try_razer_mode / docs/research_internal.md
