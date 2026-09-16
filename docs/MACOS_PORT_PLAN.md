@@ -18,7 +18,7 @@ Decisions already made:
 - `config/payload.rs`, most of `config/load.rs`, `config/mod.rs` (except the `VIRTUAL_KEY` fields).
 - `hypershift.rs` state machine `on_trigger_edge_with` (L63-99) and `CURRENT_LAYER`.
 - `main.rs` logging, `app_root()` (needs a macOS branch, see Phase 2), config hot-reload, hysteresis `process_key_depths`, `build_razer_cmd`, unlock command.
-- Config vocabulary: key names are a closed OS-neutral string set (`0-9`, `A-Z`, `F1-F24`, `LEFT/UP/RIGHT/DOWN`, `SPACE ENTER TAB ESCAPE BACKSPACE LSHIFT RSHIFT LCTRL RCTRL LALT RALT HOME END PAGEUP PAGEDOWN INSERT DELETE`, `MEDIA_*`, `VOLUME_*`). Users' `config.toml` files carry over.
+- Config vocabulary: key names are a closed OS-neutral string set (`0-9`, `A-Z`, `F1-F24`, `LEFT/UP/RIGHT/DOWN`, `SPACE ENTER TAB ESCAPE BACKSPACE LSHIFT RSHIFT LCTRL RCTRL LALT RALT HOME END PAGEUP PAGEDOWN INSERT DELETE`, `MEDIA_*`, `VOLUME_*`; the port added `LCMD RCMD` and the punctuation keys `LBRACKET RBRACKET SEMICOLON QUOTE COMMA PERIOD SLASH BACKSLASH MINUS EQUALS GRAVE`). Users' `config.toml` files carry over.
 
 ## What is Windows-bound (must be abstracted or replaced)
 

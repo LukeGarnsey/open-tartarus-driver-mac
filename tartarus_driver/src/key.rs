@@ -162,6 +162,19 @@ define_keys! {
     // A PC keyboard's Insert key reaches macOS as kVK_Help.
     Insert => "INSERT", win: 0x2D, mac: Code(0x72);
     Delete => "DELETE", win: 0x2E, mac: Code(0x75);
+    // --- punctuation (added with the macOS port; physical US-layout
+    // positions, VK_OEM_* on Windows / kVK_ANSI_* on macOS) ---
+    LBracket => "LBRACKET", win: 0xDB, mac: Code(0x21);
+    RBracket => "RBRACKET", win: 0xDD, mac: Code(0x1E);
+    Semicolon => "SEMICOLON", win: 0xBA, mac: Code(0x29);
+    Quote => "QUOTE", win: 0xDE, mac: Code(0x27);
+    Comma => "COMMA", win: 0xBC, mac: Code(0x2B);
+    Period => "PERIOD", win: 0xBE, mac: Code(0x2F);
+    Slash => "SLASH", win: 0xBF, mac: Code(0x2C);
+    Backslash => "BACKSLASH", win: 0xDC, mac: Code(0x2A);
+    Minus => "MINUS", win: 0xBD, mac: Code(0x1B);
+    Equals => "EQUALS", win: 0xBB, mac: Code(0x18);
+    Grave => "GRAVE", win: 0xC0, mac: Code(0x32);
     // --- media / volume (the old MEDIA_KEY_TABLE; configui's own category) ---
     MediaPlayPause => "MEDIA_PLAY_PAUSE", win: 0xB3, mac: Media(NX_KEYTYPE_PLAY);
     MediaStop => "MEDIA_STOP", win: 0xB2, mac: Unsupported;
@@ -368,6 +381,17 @@ mod tests {
             (Key::PageDown, VK_NEXT),
             (Key::Insert, VK_INSERT),
             (Key::Delete, VK_DELETE),
+            (Key::LBracket, VK_OEM_4),
+            (Key::RBracket, VK_OEM_6),
+            (Key::Semicolon, VK_OEM_1),
+            (Key::Quote, VK_OEM_7),
+            (Key::Comma, VK_OEM_COMMA),
+            (Key::Period, VK_OEM_PERIOD),
+            (Key::Slash, VK_OEM_2),
+            (Key::Backslash, VK_OEM_5),
+            (Key::Minus, VK_OEM_MINUS),
+            (Key::Equals, VK_OEM_PLUS),
+            (Key::Grave, VK_OEM_3),
             (Key::MediaPlayPause, VK_MEDIA_PLAY_PAUSE),
             (Key::MediaStop, VK_MEDIA_STOP),
             (Key::MediaNext, VK_MEDIA_NEXT_TRACK),
