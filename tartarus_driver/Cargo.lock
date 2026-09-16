@@ -344,6 +344,7 @@ dependencies = [
  "ctrlc",
  "hidapi",
  "interception",
+ "objc2",
  "serde",
  "serde_json",
  "tiny_http",

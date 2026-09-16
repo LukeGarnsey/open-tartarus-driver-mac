@@ -24,10 +24,19 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
 - **`src/platform/macos.rs` is a compiling skeleton**: `send_key` warns
   once and types nothing; `spawn_input_capture` only checks for root.
   Shutdown handler (ctrlc) and `open_url` are final.
-- **Nothing has been built on a real Mac yet.** First job: `cargo build`,
-  then Phase 0 (hardware probe) before writing Phase 2/3 code.
-- Verified so far only on Linux (`cargo test`, 41 pass) and via
-  `cargo check --tests --target x86_64-pc-windows-gnu`.
+- **Phase 0 done (2026-09-16)** on an Apple Silicon Mac with the keypad:
+  `cargo build` + `cargo test` (41 pass) are green on macOS, and
+  `examples/mac_probe.rs` verified every open question — results table and
+  per-step pass/fail are in the plan under "Phase 0 … Results". Headlines:
+  IF0/IF2 reports are 8-byte **unnumbered** (no ID byte); IF1's primary
+  usage is Keyboard so `analog_device_infos()` must pick
+  `interface_number() == 1` on macOS; IF2 can be seized **without** root
+  (only IF0 needs it); diagonal D-pad = two codes in the key array;
+  CGEventPost + NSEvent media emission works; two shared IF1 readers work.
+- **Next: Phase 2** (`send_key` for real, `analog_device_infos` fix,
+  Accessibility prompt, `app_root()` bundle path), then Phase 3.
+- Windows regression check: `cargo check --tests --target x86_64-pc-windows-gnu`
+  (done on Linux; no mingw on this Mac yet).
 
 ## Hard constraints
 
@@ -41,8 +50,9 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
 - The analog interface must be opened **non-exclusively** (hidapi
   `macos-shared-device` is on) because `configui` runs as a separate process
   and opens its own handle for live calibration. Only IF0/IF2 get seized,
-  via the process-global C flag `hid_darwin_set_open_exclusive(int)`
-  declared `extern "C"` (hidapi-rs 2.6 has no per-open toggle).
+  by flipping the process-global `HidApi::set_open_exclusive(true)` around
+  exactly those two opens (public hidapi-rs API on macOS; no per-open
+  toggle, so do the seized opens before any other thread opens anything).
 - Key emission: hand-rolled CoreGraphics (`CGEventPost`, kVK codes already in
   `key.rs`) + `NSEvent` SystemDefined subtype 8 for media keys. Don't adopt
   `enigo` (no L/R Alt or L/R Cmd distinction). `F21-F24` and `MEDIA_STOP`
@@ -63,13 +73,21 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
 - hidapi on macOS lists one `DeviceInfo` per (device, usage pair) with the
   same `path()`; `analog_device_infos()` already dedupes by path.
 - Report-ID framing differs from Windows: macOS only prepends the ID byte
-  for numbered reports. Analog report `0x06` is numbered; IF0/IF2 reports
-  may not be — dump raw bytes in Phase 0 before assuming offsets.
+  for numbered reports. Analog report `0x06` is numbered (24 B, same
+  offsets as Windows); IF0/IF2 reports are **unnumbered** 8 B — mods/buttons
+  at `buf[0]`, keys at `buf[2..8]`, wheel at `buf[3]`.
 - OpenRazer PR #2710: the device-mode-3 unlock caused firmware reset loops
   on some units. Watch `log stream --predicate 'subsystem == "com.apple.iokit.IOUSBHostFamily"'`
   during Phase 0.
 - Quit Razer Synapse for Mac / razer-macos before testing (they don't
   support the Tartarus Pro, but anything poking IF2 can flip device mode).
+  Synapse's DriverKit dexts (`com.razer.appengine.driver`) stay loaded
+  even with the GUI quit; they did not interfere in Phase 0.
+- TCC is attributed to the *responsible* app. Running from Claude Code's
+  own app bundle needed its own Input Monitoring grant, and its
+  Accessibility grant never took effect — use a plain Terminal.app window
+  for `emit`/`sudo` tests. `sudo` can't prompt from Claude's Bash tool
+  (no TTY); run root tests in Terminal.
 - `app_root()` writes `config.toml`/`logs/` next to the exe — inside a
   signed `.app` that breaks the signature. Phase 2 adds an Application
   Support path for the bundle case.

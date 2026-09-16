@@ -36,17 +36,17 @@ Decisions already made:
 
 ## Verified macOS facts that drive the design
 
-- **hidapi on macOS opens every device in exclusive/seize mode by default.** hidapi-rs 2.6 does *not* expose a per-open toggle; the `macos-shared-device` Cargo feature flips the process-global default to non-exclusive. The C symbol `hid_darwin_set_open_exclusive(int)` is linked in and can be declared `extern "C"` to flip it around specific opens.
+- **hidapi on macOS opens every device in exclusive/seize mode by default.** The `macos-shared-device` Cargo feature flips the process-global default to non-exclusive at `HidApi::new()`. There is no per-open toggle, but hidapi-rs 2.6.6 exposes the global one **safely** as `HidApi::set_open_exclusive(bool)` / `get_open_exclusive()` plus `HidDevice::is_open_exclusive()` (only on macOS) — no `extern "C"` declaration needed. Verified 2026-09-16: flip to `true`, `open_device`, flip back to `false` seizes exactly that one handle.
 - **Seizing a keyboard-usage device (primary usage page 1 / usage 6 or 7) needs root**; seizing mouse-usage or vendor-usage devices does not (Input Monitoring permission suffices).
-- **hidapi macOS enumeration emits one `DeviceInfo` per (IOHIDDevice, usage pair), all sharing the same `path()`** — must dedupe by path or the same interface gets opened twice.
+- **hidapi macOS enumeration emits one `DeviceInfo` per (IOHIDDevice, usage pair), all sharing the same `path()`** — must dedupe by path or the same interface gets opened twice. `interface_number()` is populated (0/1/2) on macOS, so the backend can address interfaces by number instead of by usage. **IF1 (analog) enumerates with primary usage 0x0001/0x0006 (Keyboard)** — see Phase 0 results — so the usage-based boot-collection filter in `analog_device_infos()` is wrong on macOS; filter by `interface_number() == 1` there.
 - macOS delivers input reports to every non-seized opener, so the separate-process `configui` calibration reader keeps working as long as the analog interface is *not* seized.
 - Reading a `HidDevice` from another thread is fine on macOS (per-device CFRunLoop thread + queue); `HidDevice: Send`.
-- Report-ID framing: Windows hidapi always prepends a report-ID byte; macOS only for numbered reports. Analog report `0x06` is numbered (`buf[0]==0x06` holds on both). Boot-keyboard / mouse reports may be unnumbered on macOS — Phase 0 dumps raw bytes.
+- Report-ID framing: Windows hidapi always prepends a report-ID byte; macOS only for numbered reports. Analog report `0x06` is numbered (`buf[0]==0x06` holds on both, 24-byte reports, `buf[1..=20]` = depths — the driver's offsets need no change). **IF0 and IF2 reports are unnumbered on macOS: 8 bytes, no ID byte** (verified 2026-09-16; layouts in the Phase 0 results table).
 - Key emission: CoreGraphics `CGEventCreateKeyboardEvent` + `CGEventPost(kCGHIDEventTap)` with kVK codes; media/volume keys need `NSEvent otherEventWithType:NSEventTypeSystemDefined subtype:8`. Requires **Accessibility** TCC. `enigo` is *not* a fit (no L/R Alt or L/R Cmd distinction, `MEDIA_STOP`/`INSERT`/`F21-F24` cfg'd out on mac) — hand-roll (~150 lines).
 - `tray-icon` 0.25 on macOS must be created on the main thread with an `NSApplication` run loop running.
-- TCC grants are keyed to code identity: ad-hoc `codesign -s -` loses grants every rebuild; a self-signed cert from Keychain Access (or Developer ID) gives a stable identity. A CLI run from Terminal is attributed to Terminal.app.
+- TCC grants are keyed to code identity: ad-hoc `codesign -s -` loses grants every rebuild; a self-signed cert from Keychain Access (or Developer ID) gives a stable identity. A CLI run from Terminal is attributed to Terminal.app — more precisely to the *responsible process*: observed 2026-09-16 that the same binary launched under Terminal.app vs. under the Claude Code app bundle needed separate Input Monitoring grants, and that the Accessibility grant for the app-bundle case did not take effect even when toggled on (Terminal.app's did). Document for users: grant the terminal you actually launch from.
 - Razer Synapse for Mac / `razer-macos` don't support the Tartarus Pro; still document "quit them" since anything poking interface 2 can flip device mode.
-- OpenRazer PR #2710: device-mode 3 (the unlock) caused firmware reset loops on some units — watch for re-enumeration in Phase 0.
+- OpenRazer PR #2710: device-mode 3 (the unlock) caused firmware reset loops on some units — **not observed** on this unit (2026-09-16, `log show` over the IOUSBHostFamily subsystem showed zero events across repeated unlocks). Also: the unlock is idempotent; re-sending it while already in mode 3 produces no standby report and no side effects.
 
 ## Phases
 
@@ -61,6 +61,25 @@ Throwaway `tartarus_driver/examples/mac_probe.rs` (not shipped). Record:
 6. Two non-exclusive readers on IF1 in two processes both receive `0x06` (validates keeping calibration unchanged).
 
 Exit: a table interface → usage → report format; pass/fail for 4-6.
+
+**Results (2026-09-16, Apple Silicon MacBook Pro, macOS 15 / Darwin 24.6, Tartarus Pro FW as shipped, Razer Synapse GUI not running but its DriverKit dexts `com.razer.appengine.driver` still loaded — they did not interfere).** `examples/mac_probe.rs` is kept in the tree (macOS-only; stub `main` elsewhere so CI's `cargo test` still compiles it) for re-verification on other units.
+
+| if | hidapi usage pairs (primary first) | report | layout (macOS, no ID byte unless noted) |
+|---|---|---|---|
+| 0 | `0001/0006` Keyboard | 8 B, unnumbered | `[mods][00][k1..k6]`. D-pad: `k` = `0x52` up, `0x4f` right, `0x51` down, `0x50` left; **diagonals put two codes in the array** (`52 4f`), so diff all six slots. Hyper Response = `mods & 0x04` (Left Alt), no keycode. |
+| 1 | `0001/0006` Keyboard, `000c/0001` Consumer, `0001/0080` SysCtl, `0001/0000` | 24 B, **numbered `0x06`** | `[06][d1..d20][00 00 00]`, depths 0-255, identity mapping, ~1 report/ms while a key moves. Same as Windows. |
+| 2 | `0001/0002` Mouse, `0001/0001` Pointer | 8 B, unnumbered | `[buttons][x][y][wheel][..]`. Middle = `buttons & 0x04`; wheel = signed i8 in `buf[3]` (`+1` up, `-1` down). Also the feature-report control channel (unlock + lighting). |
+
+| step | result |
+|---|---|
+| 2 analog, no root | PASS — IF2 and IF1 open non-exclusively after the Input Monitoring grant; unlock accepted; all-zero standby `0x06` arrives 2 ms later, then live data. No USB re-enumeration. |
+| 4a seize IF0 as user | FAIL as predicted — `0xE00002C1 kIOReturnNotPrivileged`. |
+| 4b seize IF2 as user | PASS — `is_open_exclusive()==true`, probe still receives wheel/middle, **OS stops scrolling**. Root not needed for IF2. |
+| 4c seize IF0 as root | PASS — arrows/Alt delivered to the probe only. |
+| 5 emission | PASS — `CGEventPost` letters; held LShift (flags `kCGEventFlagMaskShift \| NX_DEVICELSHIFTKEYMASK`) → `A`; LCmd+A / Right / F13 / PageUp / Enter; `NSEvent` SystemDefined subtype 8 volume-up (HUD shown) and play/pause (Music toggled). `CGEventSourceCreate(kCGEventSourceStatePrivate)` works. |
+| 6 two shared readers | PASS — two processes on IF1 both received every `0x06` report. `configui` calibration design stands. |
+
+Consequences for later phases: Phase 2's `analog_device_infos()` macOS branch must select `interface_number() == 1` (the current usage filter also keeps IF2 via its `0001/0001` entry); Phase 3 parses IF0 at `buf[0]` (mods) / `buf[2..8]` (keys) and IF2 at `buf[0]` (buttons) / `buf[3]` (wheel) with **no** report-ID offset, and can seize IF2 without root (only IF0 needs it — so a non-root run can still remap wheel/middle, and only D-pad/Hyper Shift degrade). Phase 3 uses `HidApi::set_open_exclusive` rather than the `extern "C"` flag.
 
 ### Phase 1 — Portability refactor, Windows stays green (~2-3 days)
 
@@ -110,12 +129,12 @@ Verify on hardware: D-pad → K/W/L/S with zero arrow leakage (text editor + ter
 
 ## Risks
 
-- **hidapi exclusive toggle is a global, non-public C flag** — the `extern "C"` declaration is sound today but fragile against hidapi-sys changes. Keep a test that the symbol links; fallback is opening IF2/IF0 via `io-kit-sys` directly.
-- **Multiple `DeviceInfo` per device on macOS** — without path dedupe `open_analog_devices` opens IF1 twice.
-- **TCC identity** — `cargo run` attributes to Terminal; shipped binary needs a stable signing identity or users re-grant after every update.
+- **hidapi exclusive toggle is process-global** — `HidApi::set_open_exclusive(true)` must be flipped back to `false` immediately after the IF0/IF2 opens, and no other thread may open a device in between (open the seized handles before spawning anything else). Resolved: it is a public hidapi-rs API, not an `extern "C"` hack.
+- **Multiple `DeviceInfo` per device on macOS** — without path dedupe `open_analog_devices` opens IF1 twice. Confirmed; and IF1's *first* entry is a Keyboard usage, so the shared usage filter must be replaced by an `interface_number()` check on macOS (Phase 2).
+- **TCC identity** — `cargo run` attributes to the responsible (terminal/host) app; shipped binary needs a stable signing identity or users re-grant after every update. Observed: Accessibility granted to a non-Terminal host app did not take effect for a child CLI, Terminal.app's did — test the shipped `.app` path explicitly in Phase 4.
 - **`app_root()` inside a signed bundle** must be fixed before shipping an `.app`.
-- **Root + tray** — tray needs the user session, D-pad needs root; may end up as two processes.
-- **OpenRazer #2710 reset loop** — same feature report as Windows, unobserved there, but Phase 0 watches for it.
+- **Root + tray** — tray needs the user session, D-pad needs root; may end up as two processes. Softened by Phase 0: wheel/middle remap (IF2) works without root, only D-pad/Hyper Shift (IF0) need it.
+- **OpenRazer #2710 reset loop** — same feature report as Windows; not reproduced on the test unit (Phase 0). Keep the `log stream` hint in USAGE for users with other firmware.
 - **Modifier state tracking** — if `HELD_FLAGS` is wrong, Shift/Ctrl remaps silently do nothing; Phase 2 tests cover it.
 - **Layout dependence** — kVK codes are physical ANSI positions; non-QWERTY layouts get different characters (same caveat as Windows VKs).
 
