@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  LaunchAgent sample: start Tartarus Driver's menu-bar (tray) mode at login,
+  as your user. This gives analog keys + wheel/middle-click remap without a
+  password; D-pad / Hyper Shift need root (see USAGE.md, macOS section) and
+  are not covered by this agent.
+
+  Install:
+    cp scripts/macos/io.github.open-tartarus-driver.plist ~/Library/LaunchAgents/
+    (edit ProgramArguments below to wherever you put the .app)
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/io.github.open-tartarus-driver.plist
+  Remove:
+    launchctl bootout gui/$(id -u)/io.github.open-tartarus-driver
+    rm ~/Library/LaunchAgents/io.github.open-tartarus-driver.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>io.github.open-tartarus-driver</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Applications/Tartarus Driver.app/Contents/MacOS/tartarus_driver</string>
+        <string>tray</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+</dict>
+</plist>

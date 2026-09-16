@@ -9,9 +9,12 @@
 
 ### Unreleased (macOS port, `macos-port` branch)
 
-- **Changed (internal)**: all OS-specific code now sits behind `src/platform/` (Windows: the original SendInput / Win32 / Interception code, unchanged in behaviour) and keys are represented by a platform-neutral `Key` type (`src/key.rs`, one table holding the name, Windows VK and macOS keycode for every key) instead of the Win32 `VIRTUAL_KEY`. The D-pad/wheel/middle-click/Hyper Response emit logic moved from `dpad.rs` into OS-neutral `src/remap.rs`; `dpad.rs` is now just the Windows/Interception shell around it. The crate builds on Linux/macOS with a logging-only backend (no key emission yet).
+- **Added: macOS support** — the whole feature set on Apple Silicon and Intel Macs, verified on real hardware: analog keys with the same hysteresis/3-layer/hot-reload behaviour, all key names incl. modifiers (Option/Command as `LALT`/`RALT`/`LCMD`/`RCMD`), media/volume keys, LED lighting, the browser config page with live calibration, D-pad/wheel/middle-click remap and Hyper Shift, and a menu-bar icon for `tray` mode. No kernel driver: the D-pad/wheel remap works by seizing the keypad's own HID interfaces, which for the D-pad/thumb button needs the driver started with `sudo` (wheel/middle-click and everything else work without it). Two macOS permissions are prompted on first launch (Accessibility, Input Monitoring). `F21`–`F24` and `MEDIA_STOP` are not available on macOS. See `USAGE.md` section 9.
+- **Added**: `Tartarus Driver.app` — a universal, signed bundle built by `scripts/macos/make-app.sh` and published in the release zip. Double-clicking it starts `tray` mode; its `config.toml` and `logs/` live in `~/Library/Application Support/open-tartarus-driver/`. A LaunchAgent sample for start-at-login is included.
 - **Added**: `LCMD`/`RCMD` key names (the Windows keys on Windows, Command on macOS).
-- **Added**: `.github/workflows/ci.yml` — build + test on Windows, macOS and Linux for every push.
+- **Added**: `.github/workflows/ci.yml` — build + test on Windows, macOS and Linux for every push; `release.yml` now also produces the macOS zip.
+- **Changed (internal)**: all OS-specific code sits behind `src/platform/` (Windows: the original SendInput / Win32 / Interception code, unchanged in behaviour) and keys are represented by a platform-neutral `Key` type (`src/key.rs`, one table holding the name, Windows VK and macOS keycode for every key) instead of the Win32 `VIRTUAL_KEY`. The D-pad/wheel/middle-click/Hyper Response emit logic moved from `dpad.rs` into OS-neutral `src/remap.rs`; `dpad.rs` is now just the Windows/Interception shell around it. The Interface 2 control handle is shared behind a mutex because on macOS it doubles as the wheel/middle-click reader.
+- **Windows**: no behaviour change intended; the Interception path, tray and key emission are untouched.
 
 ### v1.0.7
 
@@ -65,6 +68,15 @@ Initial public release.
 
 <a name="japanese"></a>
 ## 日本語
+
+### 未リリース (macOS移植、`macos-port`ブランチ)
+
+- **追加: macOS対応** — Apple Silicon / Intel Macで全機能が動作(実機検証済み): 同じヒステリシス/3レイヤー/ホットリロード挙動のアナログキー、修飾キーを含む全キー名(Option/Commandは`LALT`/`RALT`/`LCMD`/`RCMD`)、メディア/音量キー、LEDライティング、ライブキャリブレーション付きブラウザ設定画面、十字キー/ホイール/中クリックのリマップとハイパーシフト、そして`tray`モード用のメニューバーアイコン。カーネルドライバは不要: 十字キー/ホイールのリマップはキーパッド自身のHIDインターフェースを独占取得する方式で、十字キー/サムボタンについてはドライバを`sudo`で起動する必要がある(ホイール/中クリックとその他の機能は`sudo`なしで動く)。初回起動時にmacOSの権限を2つ(アクセシビリティ、入力監視)求められる。`F21`〜`F24`と`MEDIA_STOP`はmacOSでは使えない。詳細は`USAGE.md`の9節。
+- **追加**: `Tartarus Driver.app` — `scripts/macos/make-app.sh`で生成する署名済みユニバーサルバンドル(リリースzipに同梱)。ダブルクリックで`tray`モード起動。`config.toml`と`logs/`は`~/Library/Application Support/open-tartarus-driver/`に置かれる。ログイン時自動起動用のLaunchAgentサンプルも同梱。
+- **追加**: キー名`LCMD`/`RCMD`(WindowsではWindowsキー、macOSではCommandキー)。
+- **追加**: `.github/workflows/ci.yml` — pushごとにWindows/macOS/Linuxでビルド + テスト。`release.yml`はmacOS用zipも生成するようになった。
+- **変更(内部)**: OS依存コードをすべて`src/platform/`配下に分離(Windows側は従来のSendInput / Win32 / Interceptionコードのままで挙動は変更なし)。キーはWin32の`VIRTUAL_KEY`ではなくプラットフォーム非依存の`Key`型(`src/key.rs`。キー名・Windows VK・macOSキーコードを1つの表で管理)で表現するようになった。十字キー/ホイール/中クリック/Hyper Responseの送出ロジックは`dpad.rs`からOS非依存の`src/remap.rs`へ移動し、`dpad.rs`はそのWindows/Interception用の外殻になった。Interface 2の制御ハンドルはmacOSでホイール/中クリックの読み取りにも使うため、mutexで共有する形に変更。
+- **Windows**: 挙動の変更は意図していない。Interception経由の処理・タスクトレイ・キー送出は手を付けていない。
 
 ### v1.0.7
 

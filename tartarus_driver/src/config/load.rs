@@ -325,9 +325,17 @@ fn try_reload_from(path: &std::path::Path) -> Option<DriverConfig> {
     let text = match std::fs::read_to_string(path) {
         Ok(t) => t,
         Err(_) => {
+            // The "how to create one" hint depends on how the driver was
+            // launched: from a source checkout the cargo command is right;
+            // inside the macOS .app bundle there is no cargo, but the
+            // menu-bar icon's settings item opens the same page.
+            let hint = if cfg!(target_os = "macos") && path.to_string_lossy().contains("/Library/Application Support/") {
+                "Use the menu-bar icon's \"設定を開く (configui)\" item to create one."
+            } else {
+                "Run `cargo run --release -- configui` to create one."
+            };
             println!(
-                "No config.toml found at {} — using built-in placeholder keymap. \
-                 Run `cargo run --release -- configui` to create one.",
+                "No config.toml found at {} — using built-in placeholder keymap. {hint}",
                 path.display()
             );
             return None;

@@ -16,6 +16,8 @@ mod platform;
 mod remap;
 #[cfg(windows)]
 mod tray;
+#[cfg(target_os = "macos")]
+mod tray_macos;
 use key::Key;
 // Every synthetic keystroke the crate emits goes through the OS backend
 // selected in platform/mod.rs; `crate::send_key` stays the crate-wide name
@@ -565,6 +567,16 @@ fn main() {
     println!("tartarus_driver v{VERSION}");
 
     let subcommand = env::args().nth(1);
+    // macOS: double-clicking "Tartarus Driver.app" in Finder launches the
+    // binary with no arguments, and a .app has no console to run the
+    // normal mode in — so a bundled launch without a subcommand means
+    // `tray`. A bare CLI binary keeps the usual "no argument = run in the
+    // terminal until Ctrl+C" behaviour.
+    #[cfg(target_os = "macos")]
+    let subcommand = subcommand.or_else(|| {
+        let exe_dir = std::env::current_exe().ok()?;
+        platform::bundle_app_root(exe_dir.parent()?).map(|_| "tray".to_string())
+    });
     match subcommand.as_deref() {
         Some("configui") => {
             configui::run_configui_server();
@@ -619,17 +631,31 @@ fn run_tray_mode() {
 
     std::thread::spawn(configui::run_configui_server);
     #[cfg(windows)]
-    tray::spawn_tray_icon_thread();
-    // macOS: a real menu-bar icon is planned (docs/MACOS_PORT_PLAN.md Phase
-    // 4); until then `tray` mode is just "driver + configui server, no
-    // console handler", stopped with Ctrl+C / SIGTERM.
-    #[cfg(not(windows))]
+    {
+        tray::spawn_tray_icon_thread();
+        run_driver(true, 0);
+    }
+    // macOS: AppKit wants the menu-bar icon on the main thread inside a
+    // running NSApplication loop, so the roles flip — the driver loop moves
+    // to a worker thread and the tray owns the main thread (see
+    // tray_macos.rs). Whichever way shutdown is requested ("終了", Ctrl+C,
+    // SIGTERM), the driver thread finishes its stuck-key cleanup and then
+    // ends the process; `run_menu_bar` itself never returns.
+    #[cfg(target_os = "macos")]
     {
         platform::install_shutdown_handler();
-        println!("tray mode: no tray icon on this platform yet — settings page at {CONFIGUI_URL}");
+        std::thread::spawn(|| {
+            run_driver(true, 0);
+            std::process::exit(0);
+        });
+        tray_macos::run_menu_bar();
     }
-
-    run_driver(true, 0);
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        platform::install_shutdown_handler();
+        println!("tray mode: no tray icon on this platform — settings page at {CONFIGUI_URL}");
+        run_driver(true, 0);
+    }
 }
 
 // The actual analog-key-read + hysteresis + SendInput driver loop, shared by

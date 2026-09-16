@@ -11,7 +11,7 @@
 <a name="english"></a>
 ## English
 
-**`tartarus_driver`** is a from-scratch Rust driver for the Razer Tartarus Pro (the left-hand analog gaming keypad) that runs on Windows **without Razer Synapse at all** — no background service, no telemetry, no vendor software required.
+**`tartarus_driver`** is a from-scratch Rust driver for the Razer Tartarus Pro (the left-hand analog gaming keypad) that runs on Windows and macOS **without Razer Synapse at all** — no background service, no telemetry, no vendor software required.
 
 > **Disclaimer**: This is an independent, community-developed project, not affiliated with, endorsed by, or supported by Razer Inc. "Razer" and "Tartarus" are trademarks of Razer Inc. Provided as-is, with no warranty (see the [License](#license) section).
 
@@ -19,10 +19,11 @@
 
 - **Full analog key support** — reads the raw 0-255 depth of all 20 keys directly over HID and converts it to keystrokes with hysteresis-based actuation (no chattering)
 - **Fully remappable, no recompiling** — every key, the D-pad, the wheel, and middle-click can be reassigned from a browser-based config page (`configui`), including a **live sensitivity calibration view**, **per-key actuation thresholds**, and **media/volume keys** as a separate picker category
-- **D-pad / wheel / middle-click remap** at the kernel level (via [Interception](https://github.com/oblitum/Interception)) — a real keyboard/mouse plugged in at the same time is never affected
+- **D-pad / wheel / middle-click remap** at the kernel level (Windows: via [Interception](https://github.com/oblitum/Interception); macOS: by taking exclusive hold of the keypad's own HID interfaces) — a real keyboard/mouse plugged in at the same time is never affected
 - **Hyper Shift**: the "Hyper Response" thumb button, fully configurable — either a layer-switch trigger (momentary hold, or toggle cycling through 2-3 layers) or a plain modifier key passthrough (default Alt), with no side effects on a real keyboard's Alt+Tab
 - **LED lighting control** — static color, breathing, spectrum, wave, and reactive effects
-- **Runs in the background indefinitely**, optionally from a system tray icon (`tray` mode) with no console window
+- **Runs in the background indefinitely**, optionally from a system tray / menu-bar icon (`tray` mode) with no console window
+- **macOS port** (this fork): the same driver, config file and browser UI on Apple Silicon and Intel Macs — see "macOS" under Requirements and `USAGE.md` section 9
 
 ### Screenshots
 
@@ -40,18 +41,30 @@ Media/volume keys as their own category in the key picker — here the wheel and
 
 ### Requirements
 
+**Windows**
+
 - Windows 10/11
 - A Razer Tartarus Pro
 - The [Interception](https://github.com/oblitum/Interception) driver — optional, but required for D-pad/wheel/middle-click remapping and for Hyper Shift to avoid affecting a real keyboard's Alt key (see "Known limitation" below)
 - **Razer Synapse must be fully closed (task-killed) before running `tartarus_driver`, every time** — right-click its tray icon and quit, or end its GUI process (`RzSynapse`/`RazerCentral`-type process) via Task Manager; its background services can stay running, that's fine. If Synapse's GUI is still running at the same time, it independently injects its own key bindings for the exact same physical input, causing double input (see `USAGE.md`'s Troubleshooting section).
 
+**macOS**
+
+- macOS 11 or newer, Apple Silicon or Intel (the release build is a universal binary)
+- A Razer Tartarus Pro
+- Two one-time permission grants, prompted on first launch: **Accessibility** (to type keys) and **Input Monitoring** (to read the keypad). No kernel driver, no Interception.
+- **D-pad remap and Hyper Shift need the driver started with `sudo`** — macOS only lets root take exclusive hold of a keyboard-class device. Without `sudo`, analog keys, the wheel and middle-click still work; the D-pad's arrows and the thumb button's Option key just pass through as-is.
+- Razer Synapse for Mac doesn't support the Tartarus Pro, but quit it anyway if installed — anything poking the keypad's control interface can knock it out of analog mode.
+- Not available on macOS: `F21`–`F24` and `MEDIA_STOP` (no macOS equivalent; `configui` hides them). `LALT`/`RALT` are the Option keys, `LCMD`/`RCMD` are Command.
+
 ### Download
 
-Pre-built executables are published on the repo's **Releases** page for every tagged version. Alternatively, build from source:
+Pre-built executables are published on the repo's **Releases** page for every tagged version: a Windows zip with `tartarus_driver.exe`, and a macOS zip with **`Tartarus Driver.app`** (universal). Alternatively, build from source:
 
 ```powershell
 cd tartarus_driver
-cargo build --release
+cargo build --release          # any OS
+scripts/macos/make-app.sh      # macOS: also wraps it into a signed Tartarus Driver.app under dist/
 ```
 
 ### Quick start
@@ -61,7 +74,15 @@ cd tartarus_driver
 cargo run --release          # runs until Ctrl+C
 ```
 
-No Synapse required — the driver sends the analog-stream unlock command itself at startup. While running, everything is also logged to `logs/run.log` (in addition to stdout), independent of how the process was launched.
+On macOS, double-click **`Tartarus Driver.app`** for menu-bar (`tray`) mode, or from a terminal:
+
+```sh
+cd tartarus_driver
+cargo run --release                 # analog keys + wheel/middle-click
+sudo ./target/release/tartarus_driver   # + D-pad remap and Hyper Shift
+```
+
+No Synapse required — the driver sends the analog-stream unlock command itself at startup. While running, everything is also logged to `logs/run.log` (in addition to stdout), independent of how the process was launched. (Inside the macOS `.app`, config and logs live in `~/Library/Application Support/open-tartarus-driver/` instead.)
 
 To change key assignments, run `cargo run --release -- configui` and open the URL it prints in your browser. See **[`USAGE.md`](USAGE.md)** for the full walkthrough (starting the driver, remapping keys, sensitivity, lighting, troubleshooting).
 
@@ -84,6 +105,8 @@ To solve this, D-pad/wheel/middle-click remapping (and Hypershift's Alt detectio
 4. Copy `library\x64\interception.dll` from the extracted zip into the **same folder as `tartarus_driver.exe`** (this step is easy to miss — without it, the kernel driver installs fine but `tartarus_driver` still can't load `interception.dll` and silently falls back)
 
 If any of this isn't done, `tartarus_driver` prints a warning and disables only the D-pad/wheel/middle-click remap; a real keyboard's Alt+Tab will be blocked while the driver runs. Everything else (analog keys, key remapping) keeps working normally either way (confirmed on real hardware, no crash).
+
+**macOS**: none of the above applies — there is no Interception step. The equivalent is that the driver *seizes* the keypad's boot-keyboard interface (D-pad + thumb button) and boot-mouse interface (wheel + middle click) so the OS never sees those events; the keyboard-class one needs root, hence `sudo` for D-pad/Hyper Shift (`USAGE.md` section 9 walks through it, including the permission prompts). A real keyboard/mouse is never touched — only the Tartarus's own interfaces are seized.
 
 **Anti-cheat-protected games may ignore this driver's input, or refuse to launch at all.** This driver sends keystrokes via Windows' `SendInput` API — the same mechanism virtually every keyboard remapping/macro tool uses — which carries an OS-level "synthetic input" signal that some anti-cheat engines specifically detect and discard, independent of administrator privileges (this is a deliberate anti-cheat policy decision, not a Windows permission issue admin rights can override). Third-party kernel drivers like Interception have also been reported to trigger some anti-cheat engines' launch-block checks. **Confirmed on real hardware**: Valorant (Riot Vanguard) accepts this driver's input normally; Apex Legends (Easy Anti-Cheat) does not. There is no reliable way around this for an EAC-protected title — it's intentional anti-cheat design, and reports even of stripping the OS-level injected-input flag before it reaches the game were still blocked. Because anti-cheat systems generally can't distinguish a legitimate hardware remapper from a macro/cheat tool at this level (the underlying technique is identical either way), using this driver with anti-cheat-protected competitive games may also carry account-suspension risk — use your own judgment per title. Switching to a hardware/virtual-controller-based workaround instead is **not** a safe alternative either: besides technical detection risk, some publishers now ban this class of device by policy regardless of detection — e.g. Respawn's March 2026 Apex Legends policy update classifies input adapters like Cronus Zen/Titan Two as cheating outright, with permanent, non-appealable bans.
 
@@ -127,18 +150,30 @@ Licensed under the **[GNU General Public License v3.0 (GPL-3.0)](LICENSE)**.
 
 ### 動作環境
 
+**Windows**
+
 - Windows 10/11
 - Razer Tartarus Pro本体
 - [Interception](https://github.com/oblitum/Interception)ドライバ — 任意だが、十字キー/ホイール/中クリックのリマップと、ハイパーシフトが実キーボードのAltに影響しないようにするために必要(下記「既知の制約」参照)
 - **`tartarus_driver`を起動する前に、毎回必ずRazer Synapseを完全に終了(タスクキル)しておくこと** — タスクトレイのアイコンを右クリックして終了するか、タスクマネージャーでGUIプロセス(`RzSynapse`/`RazerCentral`系)を終了する(バックグラウンドサービス自体は残っていて問題ない)。Synapseのアプリ本体が起動したままだと、同じ物理入力に対してSynapse自身も独自のキー割り当てを注入してしまい、二重入力になる(詳細は`USAGE.md`のトラブルシューティング参照)。
 
+**macOS**
+
+- macOS 11以降、Apple Silicon / Intelどちらも可(配布ビルドはユニバーサルバイナリ)
+- Razer Tartarus Pro本体
+- 初回起動時に求められる2つの権限許可(1回だけ): **アクセシビリティ**(キー送信用)と**入力監視**(キーパッド読み取り用)。カーネルドライバやInterceptionは不要。
+- **十字キーのリマップとハイパーシフトを使うには、ドライバを`sudo`で起動する必要がある** — macOSではキーボード扱いのデバイスを独占的に掴めるのはrootだけのため。`sudo`なしでもアナログキー・ホイール・中クリックは動作し、十字キーの矢印とサムボタンのOptionはそのまま素通しになるだけ。
+- Razer Synapse for MacはTartarus Proに対応していないが、インストール済みなら念のため終了しておくこと — 制御インターフェースを触るものがあるとアナログモードが解除されることがある。
+- macOSで使えないキー: `F21`〜`F24`と`MEDIA_STOP`(macOSに対応するキーがない。`configui`の一覧からも除外される)。`LALT`/`RALT`はOptionキー、`LCMD`/`RCMD`はCommandキーに相当する。
+
 ### ダウンロード
 
-タグ付きバージョンごとに、ビルド済み実行ファイルをリポジトリの**Releases**ページで配布しています。ソースからビルドする場合:
+タグ付きバージョンごとに、ビルド済み実行ファイルをリポジトリの**Releases**ページで配布しています: Windows用zip(`tartarus_driver.exe`)と、macOS用zip(ユニバーサルの**`Tartarus Driver.app`**)。ソースからビルドする場合:
 
 ```powershell
 cd tartarus_driver
-cargo build --release
+cargo build --release          # どのOSでも
+scripts/macos/make-app.sh      # macOS: さらに署名済みのTartarus Driver.appをdist/に生成
 ```
 
 ### クイックスタート
@@ -148,7 +183,15 @@ cd tartarus_driver
 cargo run --release          # Ctrl+Cを押すまで無期限に動く
 ```
 
-Synapseは不要。起動時に自動でアナログストリームの有効化コマンドを送信する。実行中は必ず`logs/run.log`にもログが出力される(標準出力と同時、シェルのパイプに依存しない)。
+macOSでは**`Tartarus Driver.app`**をダブルクリックするとメニューバー(`tray`)モードで起動する。ターミナルからの場合:
+
+```sh
+cd tartarus_driver
+cargo run --release                     # アナログキー + ホイール/中クリック
+sudo ./target/release/tartarus_driver   # + 十字キーのリマップとハイパーシフト
+```
+
+Synapseは不要。起動時に自動でアナログストリームの有効化コマンドを送信する。実行中は必ず`logs/run.log`にもログが出力される(標準出力と同時、シェルのパイプに依存しない)。(macOSの`.app`から起動した場合、設定とログは`~/Library/Application Support/open-tartarus-driver/`に置かれる。)
 
 キー割り当てを変更したい場合は`cargo run --release -- configui`を実行し、表示されたURLをブラウザで開く。起動方法・キー変更・感度・ライティング・トラブルシューティングの詳細は**[`USAGE.md`](USAGE.md)**を参照。
 
@@ -171,6 +214,8 @@ Synapseは不要。起動時に自動でアナログストリームの有効化�
 4. 展開したzip内の`library\x64\interception.dll`を、**`tartarus_driver.exe`と同じフォルダ**にコピーする(見落としやすい手順。これをしないと、カーネルドライバは入っていても`tartarus_driver`が`interception.dll`を読み込めず、気づかないうちにフォールバック動作になる)
 
 いずれかが未完了の場合、`tartarus_driver`は警告を表示してD-pad/ホイール/ホイールクリックのリマップだけを無効化し、実キーボードのAlt+Tabもドライバ動作中はブロックされる。それ以外(アナログキー・キーリマップ)はどちらの場合も正常に動作を続ける(クラッシュしない、実機で確認済み)。
+
+**macOS**: 上記はすべてWindowsの話で、macOSにInterceptionの手順はない。代わりに、ドライバがキーパッドのブートキーボードインターフェース(十字キー + サムボタン)とブートマウスインターフェース(ホイール + 中クリック)を*独占取得(seize)*し、OSにそれらのイベントが届かないようにしている。キーボード扱いの方はrootでないと掴めないため、十字キー/ハイパーシフトには`sudo`が必要(権限ダイアログを含む手順は`USAGE.md`の9節を参照)。掴むのはTartarus自身のインターフェースだけなので、実キーボード/実マウスには一切影響しない。
 
 **アンチチート導入済みのゲームでは、本ドライバの入力が無視される、またはゲーム自体が起動しないことがある。** 本ドライバはWindowsの`SendInput` API(キーボードリマップ・マクロツールのほぼ全てが使う仕組み)でキー入力を送信しているが、これにはOSレベルで「合成された入力である」ことを示す情報が付随しており、一部のアンチチートエンジンはこれを検知して意図的に無視する — これは管理者権限では回避できない(Windowsの権限問題ではなく、アンチチート側の意図的な設計判断のため)。サードパーティのカーネルドライバ(Interception等)自体がアンチチートの起動ブロック判定のトリガーになったという報告もある。**実機で確認済み**: Valorant(Riot Vanguard)は本ドライバの入力を正常に受け付けるが、Apex Legends(Easy Anti-Cheat)は受け付けない。EAC保護下のタイトルに対する確実な回避策は無い(意図的なアンチチート設計であり、OSレベルの「注入フラグ」を剥がす試みですらブロックされ続けたという報告もある)。アンチチート側は「正規のハードウェアリマップツール」と「マクロ/チートツール」をこのレベルでは区別できないため(内部的に使う技術が同一のため)、アンチチート導入済みの競技性の高いゲームで本ドライバを使うことはアカウント停止のリスクも伴い得る — タイトルごとにご自身の判断で利用してください。ハードウェア変換アダプタや仮想コントローラー方式への切り替えも安全な代替策ではない — 検知リスクとは別に、一部のパブリッシャーは検知の有無にかかわらずポリシーとしてこの種のデバイスを禁止している。例えば2026年3月のRespawnのApex Legendsポリシー更新では、Cronus Zen/Titan Two等の入力アダプタを明確にチート行為として分類し、異議申し立て不可の恒久BAN対象としている。
 

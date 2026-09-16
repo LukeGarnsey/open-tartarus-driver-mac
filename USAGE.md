@@ -11,6 +11,7 @@
 
 - Razer Synapse must **not be running**. Right-click its tray icon and quit (its background services can stay running, that's fine). If Synapse is running at the same time, it independently injects its own key bindings for the same input, causing double input.
 - To use D-pad/wheel/middle-click remapping, the [Interception](https://github.com/oblitum/Interception) driver must be installed (one-time). See "Known limitation / extra setup step" in `README.md`. Without it, everything else (analog keys, Hypershift) still works fine.
+- **On a Mac?** Sections 1–8 are written for Windows; everything about `config.toml`, `configui`, sensitivity, lighting and Hyper Shift applies unchanged, and section 9 covers what differs on macOS (installing the `.app`, the two permission prompts, `sudo` for the D-pad).
 
 ### 1.5 Folder layout
 
@@ -181,6 +182,52 @@ Some games ignore this driver's input entirely, or refuse to launch while it's r
 | A real keyboard/mouse started behaving oddly | Interception/the hook only ever targets the Tartarus Pro's hardware ID (VID 0x1532/PID 0x0244) — fail-open by design. If this still happens, it's a bug; please save `logs/run.log` for investigation |
 | Lighting was configured but nothing changes | Check `logs/run.log` for a `Lighting: effect set to "..."` line (if missing, `[lighting]`'s `effect` is still `"none"`, or the config wasn't loaded). A `WARNING: failed to send lighting ...` means the HID write itself failed |
 
+### 9. macOS
+
+Everything above applies on macOS too — same `config.toml`, same browser config page, same log lines — with these differences.
+
+#### Installing
+
+Unzip the macOS release and drag **`Tartarus Driver.app`** anywhere (e.g. `/Applications`). Or build it yourself: `scripts/macos/make-app.sh` produces the same bundle under `dist/`. The bundle is just the CLI binary plus an `Info.plist`; double-clicking it starts `tray` mode.
+
+**First launch: two permission prompts.** macOS asks for **Accessibility** (needed to type keys) and **Input Monitoring** (needed to read the keypad), attributed to whatever you launched — the `.app` itself when double-clicked, or **Terminal** when run from a terminal. Grant both under *System Settings › Privacy & Security*, then launch again (Input Monitoring only takes effect on a fresh start). If the app isn't listed under Input Monitoring, click **+** and add it by hand. The log tells you exactly which one is missing (`Accessibility permission NOT granted`, or `Input Monitoring permission is missing`).
+
+The release build is ad-hoc signed, so **every new version you download is a new identity to macOS** and both grants have to be re-done. Building it yourself with a stable self-signed certificate avoids that (`SIGN_IDENTITY="…" scripts/macos/make-app.sh`, see the script's header).
+
+#### Running
+
+| How | What you get |
+|---|---|
+| Double-click `Tartarus Driver.app` | Menu-bar icon (`tray` mode), configui running. Analog keys + wheel/middle-click. **No D-pad remap / Hyper Shift** (see below) |
+| `./tartarus_driver` (from a terminal, or `cargo run --release`) | Same, in the terminal, until Ctrl+C |
+| `sudo ./tartarus_driver` or `sudo ./tartarus_driver tray` | **Everything**, including D-pad remap and Hyper Shift. Ask for your password once; the menu-bar icon still appears |
+
+Inside a bundle the path is `"/Applications/Tartarus Driver.app/Contents/MacOS/tartarus_driver"`; the other subcommands (`configui`, `emulate`, a number of seconds) work the same way from there.
+
+**Why `sudo`?** The D-pad's arrows and the thumb button's Option key come out of the keypad's *keyboard* interface. To stop macOS from acting on them, the driver takes exclusive hold of that interface — which macOS permits only to root. The wheel and middle click come from the *mouse* interface, which any user may seize, so those work without `sudo`. Nothing but the Tartarus's own interfaces is ever seized; a real keyboard's Option/arrows are untouched. Run without `sudo` and the startup log says so: `WARNING: not running as root — D-pad remap and Hyper Shift are disabled …`.
+
+**Start at login** (as your user, i.e. without D-pad/Hyper Shift): a LaunchAgent sample is in the release zip and the repo at `scripts/macos/io.github.open-tartarus-driver.plist` — install steps are in its comments. There is no supported way yet to auto-start the `sudo` variant at login.
+
+#### Files
+
+When run from the `.app`, `config.toml` and `logs/run.log` live in **`~/Library/Application Support/open-tartarus-driver/`** (writing inside the bundle would break its signature and with it the permission grants). Run as a bare binary, they sit next to it (or at the repo root for a `cargo run`), exactly as on Windows.
+
+#### Key names
+
+`LALT`/`RALT` are the Option keys and `LCMD`/`RCMD` the Command keys. `F21`–`F24` and `MEDIA_STOP` have no macOS equivalent: `configui` doesn't offer them, and a `config.toml` that names them logs a warning and keeps the default for that key. Key codes are physical (ANSI) positions, so a non-US layout may produce different characters — same caveat as Windows.
+
+#### Troubleshooting (macOS)
+
+| Symptom | Check |
+|---|---|
+| Keys are detected (log shows `key01 DOWN`) but nothing is typed | Accessibility not granted to the thing you launched from. Log shows `Accessibility permission NOT granted`. Grant it, restart |
+| `failed to open … (0xE00002E2) … not permitted` / `No interfaces could be opened` | Input Monitoring not granted. Grant (add with **+** if not listed), then start again |
+| D-pad still moves the caret / thumb button acts as Option | Not running as `sudo` (log: `WARNING: not running as root`), or Interface 0 couldn't be seized (log: `WARNING: could not seize Interface 0`) |
+| Wheel scrolls the page **and** types the remapped key | Log shows `Interface 2 is open but not seized` — something else holds the keypad's mouse interface exclusively. Quit Razer software and replug the keypad |
+| The app quit right after the first launch | Expected: with Input Monitoring missing it cannot open the keypad and exits. Grant the permission and launch again |
+| Unplugged the keypad while running | The D-pad/wheel readers log `read failed … Restart the driver after replugging` and stop; restart the driver |
+| A shortcut from `sudo` runs reports `Accessibility NOT granted` | The grant is per launching app: run the `sudo` command from the same Terminal you granted, not from a different terminal app |
+
 ---
 
 <a name="japanese"></a>
@@ -190,6 +237,7 @@ Some games ignore this driver's input entirely, or refuse to launch while it's r
 
 - Razer Synapseは**起動していないこと**。タスクトレイのアイコンを右クリックして終了しておく(バックグラウンドサービス自体は残っていて問題ない)。同時に動いていると、Synapse自身も同じ入力に対して独自のキー割り当てを注入するため、二重入力になる。
 - 十字キー・ホイール・ホイールクリックのリマップを使うには、[Interception](https://github.com/oblitum/Interception)ドライバのインストールが必要(1回だけ)。手順は`README.md`の「既知の制約 / セットアップ追加手順」を参照。未インストールでも、それ以外の機能(アナログキー・Hypershift)は問題なく動く。
+- **Macの場合**: 1〜8節はWindows向けに書かれているが、`config.toml`・`configui`・感度・ライティング・ハイパーシフトの説明はそのまま当てはまる。macOSで異なる点(`.app`の導入、2つの権限ダイアログ、十字キーのための`sudo`)は9節にまとめた。
 
 ### 1.5 フォルダ構成
 
@@ -360,3 +408,48 @@ reactive_speed = 2       # 1-4、reactiveで使用
 | 実キーボード/実マウスの動きが変になった | Interception/フックはTartarus Pro(VID 0x1532/PID 0x0244)のハードウェアID一致だけを対象にしている(fail-open設計)。それでも問題が起きた場合はバグなので、`logs/run.log`を保存して調査する |
 | ライティングを設定したのに光り方が変わらない | `logs/run.log`に`Lighting: effect set to "..."`が出ているか確認(出ていなければ`[lighting]`の`effect`が`"none"`のまま、または設定が読み込まれていない)。`WARNING: failed to send lighting ...`が出ていればHID書き込み自体が失敗している |
 
+### 9. macOS
+
+上記の内容はmacOSでもそのまま通用する — 同じ`config.toml`、同じブラウザ設定画面、同じログ行 — 以下の点だけが異なる。
+
+#### 導入
+
+macOS用のzipを展開し、**`Tartarus Driver.app`**を好きな場所(例: `/Applications`)に置く。自分でビルドする場合は`scripts/macos/make-app.sh`で同じバンドルが`dist/`に生成される。バンドルの中身はCLIバイナリと`Info.plist`だけで、ダブルクリックすると`tray`モードで起動する。
+
+**初回起動時に2つの権限ダイアログが出る。** macOSは**アクセシビリティ**(キー送信に必要)と**入力監視**(キーパッドの読み取りに必要)の許可を求める。許可の対象は「起動元」 — ダブルクリックなら`.app`自身、ターミナルから起動したなら**ターミナル**アプリ。*システム設定 › プライバシーとセキュリティ*で両方を許可してから、もう一度起動する(入力監視は再起動後にしか反映されない)。入力監視の一覧にアプリが出てこない場合は**+**ボタンで手動で追加する。どちらが足りないかはログに明記される(`Accessibility permission NOT granted`、または`Input Monitoring permission is missing`)。
+
+配布ビルドはad-hoc署名のため、**新しいバージョンをダウンロードするたびにmacOSからは別のアプリとして扱われ**、両方の許可をやり直す必要がある。自前の自己署名証明書でビルドすればこれを避けられる(`SIGN_IDENTITY="…" scripts/macos/make-app.sh`。詳細はスクリプト冒頭のコメント参照)。
+
+#### 起動方法
+
+| 起動方法 | 使える機能 |
+|---|---|
+| `Tartarus Driver.app`をダブルクリック | メニューバーアイコン(`tray`モード)、configui起動済み。アナログキー + ホイール/中クリック。**十字キーのリマップとハイパーシフトは使えない**(下記参照) |
+| `./tartarus_driver`(ターミナルから、または`cargo run --release`) | 同上。ターミナル内でCtrl+Cまで動作 |
+| `sudo ./tartarus_driver` または `sudo ./tartarus_driver tray` | **全機能**(十字キーのリマップとハイパーシフトを含む)。パスワードを1回聞かれる。メニューバーアイコンも通常どおり出る |
+
+バンドル内のバイナリのパスは`"/Applications/Tartarus Driver.app/Contents/MacOS/tartarus_driver"`。他のサブコマンド(`configui`、`emulate`、秒数指定)もそこから同じように使える。
+
+**なぜ`sudo`が必要か**: 十字キーの矢印とサムボタンのOptionはキーパッドの*キーボード*インターフェースから出てくる。macOSにそれらを処理させないために、ドライバはそのインターフェースを独占取得するが、キーボード扱いのデバイスの独占取得はrootにしか許可されない。ホイールと中クリックは*マウス*インターフェース経由で、こちらは一般ユーザーでも独占取得できるため`sudo`なしで動く。独占取得するのはTartarus自身のインターフェースだけで、実キーボードのOption/矢印には影響しない。`sudo`なしで起動すると起動ログにその旨が出る: `WARNING: not running as root — D-pad remap and Hyper Shift are disabled …`。
+
+**ログイン時に自動起動**(一般ユーザーとして、つまり十字キー/ハイパーシフトなし): LaunchAgentのサンプルがリリースzipとリポジトリの`scripts/macos/io.github.open-tartarus-driver.plist`にある(導入手順はファイル内のコメント参照)。`sudo`版をログイン時に自動起動する手段は今のところ用意していない。
+
+#### ファイルの場所
+
+`.app`から起動した場合、`config.toml`と`logs/run.log`は**`~/Library/Application Support/open-tartarus-driver/`**に置かれる(バンドル内に書き込むと署名が壊れ、権限の許可も無効になるため)。素のバイナリとして起動した場合はその隣(`cargo run`ならリポジトリのルート)に置かれ、Windowsと同じ。
+
+#### キー名
+
+`LALT`/`RALT`はOptionキー、`LCMD`/`RCMD`はCommandキーに相当する。`F21`〜`F24`と`MEDIA_STOP`はmacOSに対応するキーがなく、`configui`の一覧には出ない。`config.toml`にこれらを書いた場合は警告をログに出してそのキーだけ既定値のままになる。キーコードは物理(ANSI)配置なので、US以外のキーボードレイアウトでは別の文字になることがある(Windowsと同じ注意点)。
+
+#### トラブルシューティング(macOS)
+
+| 症状 | 確認すること |
+|---|---|
+| キーは検知されている(ログに`key01 DOWN`が出る)のに何も入力されない | 起動元にアクセシビリティが許可されていない。ログに`Accessibility permission NOT granted`が出る。許可して再起動 |
+| `failed to open … (0xE00002E2) … not permitted` / `No interfaces could be opened` | 入力監視が許可されていない。許可(一覧になければ**+**で追加)してから起動し直す |
+| 十字キーでカーソルが動く / サムボタンがOptionとして効く | `sudo`で起動していない(ログ: `WARNING: not running as root`)か、Interface 0の独占取得に失敗している(ログ: `WARNING: could not seize Interface 0`) |
+| ホイールでページがスクロールし、**かつ**リマップしたキーも入力される | ログに`Interface 2 is open but not seized`が出ている — 他のプロセスがキーパッドのマウスインターフェースを独占している。Razer製ソフトを終了し、キーパッドを挿し直す |
+| 初回起動直後にアプリが終了した | 正常な挙動: 入力監視が未許可だとキーパッドを開けず終了する。許可してからもう一度起動する |
+| 動作中にキーパッドを抜いた | 十字キー/ホイールの読み取りスレッドが`read failed … Restart the driver after replugging`を出して停止する。ドライバを起動し直す |
+| `sudo`で起動すると`Accessibility NOT granted`になる | 許可は起動元アプリ単位。許可したのと同じターミナルアプリから`sudo`コマンドを実行する |

@@ -44,3 +44,47 @@ jobs:
         with:
           files: ${{ steps.package.outputs.asset }}
           generate_release_notes: true
+
+  # macOS: universal (Apple Silicon + Intel) "Tartarus Driver.app", built
+  # and ad-hoc signed by scripts/macos/make-app.sh. Ad-hoc means users grant
+  # Accessibility / Input Monitoring to this exact build; a re-download of a
+  # newer version needs a re-grant (USAGE.md, macOS section). Both jobs
+  # attach their asset to the same tag's release.
+  build-and-release-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+
+      - name: Cache cargo registry/build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tartarus_driver
+
+      - name: Build universal .app
+        run: scripts/macos/make-app.sh dist
+
+      - name: Package
+        id: package
+        run: |
+          version="${{ github.ref_name }}"
+          stage="tartarus_driver-$version-macos-universal"
+          mkdir -p "$stage/scripts"
+          cp -R "dist/Tartarus Driver.app" "$stage/"
+          cp README.md USAGE.md CHANGELOG.md LICENSE config.example.toml "$stage/"
+          cp scripts/macos/io.github.open-tartarus-driver.plist "$stage/scripts/"
+          # ditto keeps the bundle's structure/signature intact (zip -r would too,
+          # but ditto is what Finder's "Compress" uses).
+          ditto -c -k --sequesterRsrc --keepParent "$stage" "$stage.zip"
+          echo "asset=$stage.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.package.outputs.asset }}
+          generate_release_notes: true

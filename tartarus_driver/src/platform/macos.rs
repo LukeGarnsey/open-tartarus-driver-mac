@@ -363,7 +363,6 @@ pub fn install_shutdown_handler() {
 // LaunchAgent/.app bundle or a terminal the user already owns.
 pub fn detach_console() {}
 
-#[allow(dead_code)] // tray menu (Phase 4) will call this
 pub fn open_url(url: &str) {
     if let Err(e) = std::process::Command::new("open").arg(url).spawn() {
         eprintln!("WARNING: could not open {url}: {e}");

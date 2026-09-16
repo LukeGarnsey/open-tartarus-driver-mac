@@ -46,9 +46,16 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
   `interface_number() == 1` on macOS; IF2 can be seized **without** root
   (only IF0 needs it); diagonal D-pad = two codes in the key array;
   CGEventPost + NSEvent media emission works; two shared IF1 readers work.
-- **Next: Phase 4** — menu-bar tray (`tray_macos.rs`), `.app` packaging +
-  signing, LaunchDaemon sample, `release.yml` macOS job, README/USAGE/
-  CHANGELOG (EN + JA). Root+tray split still to be decided (see plan).
+- **Phase 4 done (2026-09-16)**: `src/tray_macos.rs` (tray-icon/muda,
+  tray on the main thread, driver on a worker thread), no-arg bundled
+  launch = `tray`, `scripts/macos/make-app.sh` (universal, signed .app),
+  LaunchAgent sample, `release.yml` macOS job, README/USAGE §9/CHANGELOG
+  in EN + JA. Verified from Finder with fresh TCC grants.
+- **All four phases are complete.** Remaining ideas, none started: root
+  LaunchDaemon for D-pad at login (TCC in a daemon context unverified),
+  reattach after unplug (reader threads currently exit), `emulate`
+  subcommand not exercised on macOS, toggle/modifier_key Hyper Shift
+  styles not exercised on macOS (OS-neutral code).
 - Windows regression check: `cargo check --tests --target x86_64-pc-windows-gnu`
   (done on Linux; no mingw on this Mac yet).
 
@@ -56,7 +63,9 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
 
 - **Windows behaviour must stay byte-for-byte unchanged** so the branch is
   upstreamable. Don't touch `platform/windows.rs`, `dpad.rs`, `tray.rs`
-  logic; keep new deps target-gated in `Cargo.toml`.
+  logic; keep new deps target-gated in `Cargo.toml`. (So far the only
+  Windows-side edits are two no-op fns in `platform/windows.rs`, an unused
+  parameter, and `ctrl` becoming `Arc<Mutex<..>>` in main.rs.)
 - **D-pad / wheel / Hyper Shift on macOS = seize the HID interfaces, run as
   root.** Decided by the user. Seizing a keyboard-usage IOHIDDevice (IF0)
   needs root (IOHIDFamily returns `kIOReturnNotPrivileged` otherwise); the
@@ -119,6 +128,7 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
 cd tartarus_driver
 cargo build && cargo test            # any OS (48 tests)
 cargo run --release -- emulate       # hardware-free harness for the key pipeline
+scripts/macos/make-app.sh            # macOS: universal signed Tartarus Driver.app -> dist/
 cargo check --tests --target x86_64-pc-windows-gnu   # Windows regression check from Linux/mac (needs mingw + target)
 ```
 CI (`.github/workflows/ci.yml`) builds + tests on Windows/macOS/Linux on

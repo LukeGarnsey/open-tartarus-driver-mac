@@ -62,3 +62,4 @@ hidapi = { version = "2.6.0", features = ["macos-shared-device"] }
 # (also used by examples/mac_probe.rs). Plain CoreGraphics key events are
 # hand-rolled `extern "C"` and need no crate.
 objc2 = "0.6"
+tray-icon = { version = "0.25", default-features = false }
