@@ -27,6 +27,9 @@ set -eu
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CRATE="$ROOT/tartarus_driver"
 OUT="${1:-$ROOT/dist}"
+# Make a relative output dir absolute now — the build below cd's into the
+# crate, which would otherwise silently redirect "dist" to tartarus_driver/dist.
+case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac
 APP="$OUT/Tartarus Driver.app"
 VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' "$CRATE/Cargo.toml" | head -1)"
 IDENTITY="${SIGN_IDENTITY:--}"
