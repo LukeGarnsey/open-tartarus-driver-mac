@@ -12,7 +12,7 @@
 # "DOWN", these named keys: "SPACE", "ENTER", "TAB", "ESCAPE", "BACKSPACE",
 # "LSHIFT", "RSHIFT", "LCTRL", "RCTRL", "LALT", "RALT", "LCMD", "RCMD",
 # "HOME", "END", "PAGEUP", "PAGEDOWN", "INSERT", "DELETE", the punctuation
-# keys (new in v1.1.0, US-layout positions): "LBRACKET" [, "RBRACKET" ],
+# keys (new in v1.1.1, US-layout positions): "LBRACKET" [, "RBRACKET" ],
 # "SEMICOLON" ;, "QUOTE" ', "COMMA" ,, "PERIOD" ., "SLASH" /, "BACKSLASH" \,
 # "MINUS" -, "EQUALS" =, "GRAVE" `, and these
 # media/volume keys (new in v1.0.5): "MEDIA_PLAY_PAUSE", "MEDIA_STOP",
