@@ -11,9 +11,9 @@
 // Alt through the device's boot keyboard interface; the wheel is a standard
 // mouse wheel and the wheel-click a standard middle button.
 
-// Until the macOS backend (Phase 3) drives these handlers, only the Windows
-// Interception shell calls them.
-#![cfg_attr(not(windows), allow(dead_code))]
+// Only the Windows (dpad.rs) and macOS (platform/macos.rs) backends drive
+// these handlers; the stub backend for other OSes has no capture at all.
+#![cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
 
 use crate::config::DpadKeymap;
 use crate::key::Key;

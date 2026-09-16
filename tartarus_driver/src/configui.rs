@@ -228,9 +228,9 @@ fn run_calibration_thread() {
     // Best-effort device-mode-3 unlock, in case the main driver isn't
     // already running and nothing else has sent it this session. Harmless
     // to resend if it has (idempotent, confirmed on real hardware).
-    if let Some(ctrl) = crate::open_razer_control_device(&api) {
+    if let Some(ctrl) = crate::open_razer_control_device(&api, false) {
         let cmd = crate::build_razer_cmd(0x01, 0x00, 0x04, &[0x03, 0x00]);
-        let _ = ctrl.send_feature_report(&cmd);
+        let _ = ctrl.lock().unwrap().send_feature_report(&cmd);
     }
 
     let devices = try_open_analog_devices(&api);

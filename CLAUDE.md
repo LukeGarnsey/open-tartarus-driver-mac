@@ -29,7 +29,14 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
   `hid_open_hint()` (Input Monitoring hint), `bundle_app_root()` for
   `.app` runs. `analog_device_infos()` picks `interface_number() == 1` on
   macOS. All hardware-verified (list in the plan's Phase 2 block).
-  `spawn_input_capture` still only checks for root (Phase 3).
+- **Phase 3 done (2026-09-16)**: `spawn_input_capture(ctrl)` runs an IF2
+  reader (wheel/middle, no root) on the seized control handle main.rs
+  now opens (`open_razer_control_device(api, seize_for_capture)` →
+  `Arc<Mutex<HidDevice>>`, shared with lighting because a seized device
+  refuses feature reports from other handles) and, when root, seizes IF0
+  for D-pad/Hyper Response. Pure `keyboard_edges`/`mouse_edges` parsers,
+  unit-tested. Hardware-verified incl. diagonals and the non-root
+  fail-open path.
 - **Phase 0 done (2026-09-16)** on an Apple Silicon Mac with the keypad:
   `cargo build` + `cargo test` (41 pass) are green on macOS, and
   `examples/mac_probe.rs` verified every open question — results table and
@@ -39,9 +46,9 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
   `interface_number() == 1` on macOS; IF2 can be seized **without** root
   (only IF0 needs it); diagonal D-pad = two codes in the key array;
   CGEventPost + NSEvent media emission works; two shared IF1 readers work.
-- **Next: Phase 3** — seize IF0 (root) / IF2 (no root needed) in
-  `spawn_input_capture`, parse the 8-byte unnumbered reports, feed
-  `remap::*`; share the IF2 handle with lighting.
+- **Next: Phase 4** — menu-bar tray (`tray_macos.rs`), `.app` packaging +
+  signing, LaunchDaemon sample, `release.yml` macOS job, README/USAGE/
+  CHANGELOG (EN + JA). Root+tray split still to be decided (see plan).
 - Windows regression check: `cargo check --tests --target x86_64-pc-windows-gnu`
   (done on Linux; no mingw on this Mac yet).
 
@@ -51,9 +58,12 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
   upstreamable. Don't touch `platform/windows.rs`, `dpad.rs`, `tray.rs`
   logic; keep new deps target-gated in `Cargo.toml`.
 - **D-pad / wheel / Hyper Shift on macOS = seize the HID interfaces, run as
-  root.** Decided by the user. Seizing a keyboard-usage IOHIDDevice needs
-  root (IOHIDFamily returns `kIOReturnNotPrivileged` otherwise). No
-  CGEventTap-correlation approach.
+  root.** Decided by the user. Seizing a keyboard-usage IOHIDDevice (IF0)
+  needs root (IOHIDFamily returns `kIOReturnNotPrivileged` otherwise); the
+  mouse-usage IF2 seizes fine as a user. No CGEventTap-correlation approach.
+- A seized IOHIDDevice rejects feature reports from any *other* handle in
+  the process (`kIOReturnExclusiveAccess`), so IF2 is opened once, seized,
+  and shared via `Arc<Mutex<HidDevice>>` between lighting and the reader.
 - The analog interface must be opened **non-exclusively** (hidapi
   `macos-shared-device` is on) because `configui` runs as a separate process
   and opens its own handle for live calibration. Only IF0/IF2 get seized,
@@ -107,7 +117,7 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
 
 ```
 cd tartarus_driver
-cargo build && cargo test            # any OS (46 tests)
+cargo build && cargo test            # any OS (48 tests)
 cargo run --release -- emulate       # hardware-free harness for the key pipeline
 cargo check --tests --target x86_64-pc-windows-gnu   # Windows regression check from Linux/mac (needs mingw + target)
 ```

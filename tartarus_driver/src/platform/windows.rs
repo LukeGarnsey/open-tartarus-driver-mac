@@ -136,6 +136,8 @@ pub fn hid_open_hint(_err: &hidapi::HidError) -> Option<&'static str> {
 // D-pad / wheel / middle-click remap + device-aware Hypershift via the
 // Interception kernel driver (see dpad.rs). Falls back internally to the
 // WH_KEYBOARD_LL hook when Interception isn't installed.
-pub fn spawn_input_capture() {
+// `_ctrl` (the Interface 2 handle) is only needed by the macOS backend;
+// Interception observes the wheel/middle-click on its own.
+pub fn spawn_input_capture(_ctrl: &Option<std::sync::Arc<std::sync::Mutex<hidapi::HidDevice>>>) {
     crate::dpad::spawn_interception_thread();
 }

@@ -15,12 +15,15 @@
 //   hid_open_hint(&err)        an extra, OS-specific sentence to log when a
 //                              HID open fails (macOS: the Input Monitoring
 //                              grant), or None
-//   spawn_input_capture()      start whatever this OS uses to intercept the
+//   spawn_input_capture(ctrl)  start whatever this OS uses to intercept the
 //                              Tartarus's own D-pad/wheel/middle-click/
 //                              Hyper Response events (Windows: the
-//                              Interception kernel driver, see dpad.rs);
-//                              must fail open — analog keys keep working
-//                              when it can't
+//                              Interception kernel driver, see dpad.rs;
+//                              macOS: the seized Interface 2 handle
+//                              `ctrl`, shared with lighting, plus a
+//                              seized Interface 0 when root); must fail
+//                              open — analog keys keep working when it
+//                              can't
 //
 // Backends:
 //   windows.rs  the original, hardware-verified SendInput / Win32 code

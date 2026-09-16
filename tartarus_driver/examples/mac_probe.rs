@@ -11,6 +11,9 @@
 //   $P raw <if> [secs]      step 3  hexdump changed reports on interface <if> (shared)
 //   $P seize <if> [secs]    step 4  open <if> EXCLUSIVELY: expect IF2 OK as user,
 //                                   IF0 kIOReturnNotPrivileged as user / OK under sudo
+//   $P dualif2 [secs]       Phase 3 design check: shared IF2 handle keeps
+//                                   sending feature reports (lighting) while a
+//                                   SECOND handle in the same process has IF2 seized
 //   $P emit                 step 5  CGEventPost + NSEvent media keys (focus TextEdit)
 //   $P raw 1  (x2 terminals) step 6 both processes must keep receiving 0x06
 //
@@ -42,6 +45,7 @@ pub(super) fn main() {
         Some("analog") => analog(secs(2, 15)),
         Some("raw") => raw(iface(&args), secs(3, 15)),
         Some("seize") => seize(iface(&args), secs(3, 10)),
+        Some("dualif2") => dual_if2(secs(2, 15)),
         Some("emit") => emit(secs(2, 8)),
         _ => {
             eprintln!("usage: mac_probe enumerate | analog [secs] | raw <if> [secs] | seize <if> [secs] | emit [delay]");
@@ -304,6 +308,57 @@ fn seize(if_no: i32, secs: u64) {
     dump_reports(&dev, secs, None);
     drop(dev);
     println!("released; OS input from if{if_no} should be back.");
+}
+
+// ---------------------------------------------------------------- Phase 3 design check
+
+fn static_color_cmd(r: u8, g: u8, b: u8) -> [u8; 91] {
+    // lighting.rs: txn 0x1f, class 0x0f (extended matrix), cmd 0x02, args
+    // [varstore 0x01, backlight 0x05, effect static 0x01, 0, 0, 1 color, r, g, b]
+    build_razer_cmd(0x1f, 0x0f, 0x02, &[0x01, 0x05, 0x01, 0x00, 0x00, 0x01, r, g, b])
+}
+
+fn dual_if2(secs: u64) {
+    let api = api();
+    let info = by_interface(&api, 2).unwrap_or_else(|| {
+        eprintln!("no interface_number==2 entry; run `enumerate`");
+        std::process::exit(1)
+    });
+    // 1. what main.rs does: shared control handle first
+    let ctrl = open_shared(&api, &info);
+    // 2. what the Phase 3 capture thread would do: a second, seized handle
+    api.set_open_exclusive(true);
+    let seized = info.open_device(&api);
+    api.set_open_exclusive(false);
+    let seized = match seized {
+        Ok(d) => {
+            println!("second handle SEIZED if2 (is_open_exclusive={:?})", d.is_open_exclusive());
+            d
+        }
+        Err(e) => {
+            println!("second handle seize FAILED: {e} -> Phase 3 must share one handle instead");
+            return;
+        }
+    };
+    // 3. lighting through the ORIGINAL shared handle while seized
+    match ctrl.send_feature_report(&static_color_cmd(0xff, 0x00, 0x00)) {
+        Ok(()) => println!("feature report via shared handle while seized: OK -> pad should be RED"),
+        Err(e) => println!("feature report via shared handle while seized: FAILED: {e}"),
+    }
+    // 4. and through the seized handle itself, for completeness
+    match seized.send_feature_report(&static_color_cmd(0x00, 0x00, 0xff)) {
+        Ok(()) => println!("feature report via seized handle: OK -> pad should be BLUE"),
+        Err(e) => println!("feature report via seized handle: FAILED: {e}"),
+    }
+    println!("reading wheel/middle via the seized handle for {secs}s (OS should NOT scroll)…");
+    dump_reports(&seized, secs, None);
+    // 5. does the shared handle ALSO still see input reports? (informational)
+    println!("now reading via the SHARED handle for 5s — roll the wheel again:");
+    dump_reports(&ctrl, 5, None);
+    match ctrl.send_feature_report(&static_color_cmd(0x00, 0xff, 0x00)) {
+        Ok(()) => println!("final feature report via shared handle: OK -> pad GREEN"),
+        Err(e) => println!("final feature report via shared handle: FAILED: {e}"),
+    }
 }
 
 // ---------------------------------------------------------------- step 5

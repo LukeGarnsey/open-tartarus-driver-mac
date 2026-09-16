@@ -43,7 +43,7 @@ pub fn hid_open_hint(_err: &hidapi::HidError) -> Option<&'static str> {
     None
 }
 
-pub fn spawn_input_capture() {
+pub fn spawn_input_capture(_ctrl: &Option<std::sync::Arc<std::sync::Mutex<hidapi::HidDevice>>>) {
     eprintln!(
         "WARNING: D-pad/wheel/middle-click remap and Hyper Shift are not available on this \
          platform yet — the Tartarus's own arrow/Alt/wheel events pass through unmodified."

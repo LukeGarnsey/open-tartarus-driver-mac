@@ -1,7 +1,7 @@
-// macOS backend. Phase 2 of docs/MACOS_PORT_PLAN.md: real key emission via
-// CoreGraphics + AppKit, the Accessibility permission prompt, and the
-// shutdown/URL helpers. Phase 3 (D-pad / wheel / Hyper Shift by seizing
-// the Tartarus's own HID interfaces) replaces `spawn_input_capture`.
+// macOS backend: key emission via CoreGraphics + AppKit (Phase 2 of
+// docs/MACOS_PORT_PLAN.md), the Accessibility permission prompt, the
+// shutdown/URL helpers, and the D-pad / wheel / middle-click / Hyper
+// Response capture by seizing the Tartarus's own HID interfaces (Phase 3).
 //
 // Every fact below that says "verified" was checked on real hardware on
 // 2026-09-16 with examples/mac_probe.rs (results table in the plan).
@@ -29,14 +29,45 @@
 // NSEvent, converted to a CGEvent and posted the same way. Verified:
 // VOLUME_UP shows the HUD, MEDIA_PLAY_PAUSE toggles Music.
 //
+// Input capture design
+// --------------------
+// Windows uses the Interception kernel driver to see and swallow the
+// Tartarus's D-pad arrows / Alt / wheel before the OS does. macOS has no
+// such filter, but IOHIDFamily lets a process open a device *seized*
+// (kIOHIDOptionsTypeSeizeDevice): every input report goes to that handle
+// only and the OS's own keyboard/mouse drivers see nothing. So:
+//   Interface 0 (boot keyboard: D-pad + Hyper Response Alt) — seized here,
+//     in its own reader thread. Seizing a keyboard-usage device needs root;
+//     without it this half fails open (arrows/Alt pass through unmodified).
+//   Interface 2 (boot mouse: wheel + middle, AND Razer's control channel)
+//     — already opened seized by main.rs's open_razer_control_device (no
+//     root needed for mouse usage) and handed in as `ctrl`; read here in a
+//     second thread under the mutex lighting also takes, because a seized
+//     device rejects feature reports from any other handle.
+//   Interface 1 (analog) is never seized so configui's separate-process
+//     calibration reader keeps working.
+// Report layouts (raw bytes dumped 2026-09-16 with examples/mac_probe.rs;
+// unlike Windows, macOS hidapi prepends NO report-ID byte here since
+// these reports are unnumbered):
+//   IF0: [modifiers][reserved][key1..key6]  modifiers bit 0x04 = Left Alt
+//        (the Hyper Response button); keys carry HID usages 0x4F right,
+//        0x50 left, 0x51 down, 0x52 up — two at once for diagonals.
+//   IF2: [buttons][x][y][wheel]  buttons bit 0x04 = middle; wheel is a
+//        signed i8, +1 per notch up, -1 per notch down.
+// Parsing is pure (`keyboard_edges`, `mouse_edges`) and unit-tested; the
+// threads only do I/O and dispatch into remap::*.
+//
 // Tests never reach send_key (same rule as Windows): the modifier
 // bookkeeping is a pure function (`next_flags`) tested on its own.
 
 use crate::key::{Key, MacKey};
+use crate::remap::{self, DpadDirection};
 use crate::{eprintln, println, SHUTDOWN_REQUESTED};
+use hidapi::{HidApi, HidDevice};
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Duration;
 
 // ---------------------------------------------------------------------------
 // Raw FFI — deliberately hand-rolled (no core-graphics / objc2-app-kit
@@ -348,20 +379,211 @@ pub fn is_root() -> bool {
     unsafe { geteuid() == 0 }
 }
 
-// Phase 3 replaces the `else` branch with the real capture thread.
-pub fn spawn_input_capture() {
+// ---------------------------------------------------------------------------
+// D-pad / wheel / middle-click / Hyper Response capture
+// ---------------------------------------------------------------------------
+
+const HID_USAGE_RIGHT: u8 = 0x4F;
+const HID_USAGE_LEFT: u8 = 0x50;
+const HID_USAGE_DOWN: u8 = 0x51;
+const HID_USAGE_UP: u8 = 0x52;
+const BOOT_KBD_LALT: u8 = 0x04;
+const BOOT_MOUSE_MIDDLE: u8 = 0x04;
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum KbdEdge {
+    HyperResponse { down: bool },
+    Arrow { dir: DpadDirection, up: bool },
+    // Something on Interface 0 that isn't a D-pad arrow — swallowed by the
+    // seize, so it's logged rather than lost silently.
+    Unknown(u8),
+}
+
+fn arrow_direction(usage: u8) -> Option<DpadDirection> {
+    match usage {
+        HID_USAGE_LEFT => Some(DpadDirection::Left),
+        HID_USAGE_UP => Some(DpadDirection::Up),
+        HID_USAGE_RIGHT => Some(DpadDirection::Right),
+        HID_USAGE_DOWN => Some(DpadDirection::Down),
+        _ => None,
+    }
+}
+
+// Diffs two 8-byte boot-keyboard reports into press/release edges, in
+// report order: modifier edge first, then releases, then presses.
+fn keyboard_edges(prev: &[u8; 8], cur: &[u8; 8]) -> Vec<KbdEdge> {
+    let mut edges = Vec::new();
+    let was_alt = prev[0] & BOOT_KBD_LALT != 0;
+    let is_alt = cur[0] & BOOT_KBD_LALT != 0;
+    if was_alt != is_alt {
+        edges.push(KbdEdge::HyperResponse { down: is_alt });
+    }
+    let held = |report: &[u8; 8], usage: u8| report[2..8].contains(&usage);
+    for &usage in &prev[2..8] {
+        if usage != 0 && !held(cur, usage) {
+            match arrow_direction(usage) {
+                Some(dir) => edges.push(KbdEdge::Arrow { dir, up: true }),
+                None => {}
+            }
+        }
+    }
+    for &usage in &cur[2..8] {
+        if usage != 0 && !held(prev, usage) {
+            match arrow_direction(usage) {
+                Some(dir) => edges.push(KbdEdge::Arrow { dir, up: false }),
+                None => edges.push(KbdEdge::Unknown(usage)),
+            }
+        }
+    }
+    edges
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum MouseEdge {
+    Wheel(i32),
+    Middle { up: bool },
+}
+
+fn mouse_edges(prev_buttons: u8, buttons: u8, wheel: i8) -> Vec<MouseEdge> {
+    let mut edges = Vec::new();
+    if wheel != 0 {
+        edges.push(MouseEdge::Wheel(wheel as i32));
+    }
+    let was = prev_buttons & BOOT_MOUSE_MIDDLE != 0;
+    let is = buttons & BOOT_MOUSE_MIDDLE != 0;
+    if was != is {
+        edges.push(MouseEdge::Middle { up: !is });
+    }
+    edges
+}
+
+fn if0_reader(dev: HidDevice) {
+    let mut prev = [0u8; 8];
+    let mut buf = [0u8; 64];
+    while !SHUTDOWN_REQUESTED.load(Ordering::SeqCst) {
+        let n = match dev.read_timeout(&mut buf, 50) {
+            Ok(n) => n,
+            Err(e) => {
+                eprintln!(
+                    "[dpad] Interface 0 read failed ({e}) — D-pad/Hyper Shift remap stopped \
+                     (keypad unplugged?). Restart the driver after replugging."
+                );
+                return;
+            }
+        };
+        if n < 8 {
+            continue;
+        }
+        let cur: [u8; 8] = buf[..8].try_into().unwrap();
+        for edge in keyboard_edges(&prev, &cur) {
+            match edge {
+                KbdEdge::HyperResponse { down } => remap::on_hyper_response(down),
+                KbdEdge::Arrow { dir, up } => remap::on_dpad_arrow(dir, up),
+                KbdEdge::Unknown(usage) => println!(
+                    "[dpad] unexpected keycode {usage:#04x} on Interface 0 (swallowed by the seize)"
+                ),
+            }
+        }
+        prev = cur;
+    }
+}
+
+fn if2_reader(ctrl: Arc<Mutex<HidDevice>>) {
+    let mut prev_buttons = 0u8;
+    let mut buf = [0u8; 64];
+    while !SHUTDOWN_REQUESTED.load(Ordering::SeqCst) {
+        // Short timeout so lighting commands from the driver loop (which
+        // take the same lock) never wait long; the lock is released between
+        // reads.
+        let n = match ctrl.lock().unwrap().read_timeout(&mut buf, 5) {
+            Ok(n) => n,
+            Err(e) => {
+                eprintln!(
+                    "[dpad] Interface 2 read failed ({e}) — wheel/middle-click remap stopped \
+                     (keypad unplugged?). Restart the driver after replugging."
+                );
+                return;
+            }
+        };
+        if n < 4 {
+            continue;
+        }
+        for edge in mouse_edges(prev_buttons, buf[0], buf[3] as i8) {
+            match edge {
+                MouseEdge::Wheel(delta) => remap::on_wheel(delta),
+                MouseEdge::Middle { up } => remap::on_middle(up),
+            }
+        }
+        prev_buttons = buf[0];
+    }
+}
+
+fn open_if0_seized() -> Result<HidDevice, String> {
+    let api = HidApi::new().map_err(|e| format!("hidapi init failed: {e}"))?;
+    let info = api
+        .device_list()
+        .find(|d| d.vendor_id() == crate::VID && d.product_id() == crate::PID && d.interface_number() == 0)
+        .cloned()
+        .ok_or("Interface 0 not found")?;
+    // Process-global flag (see open_razer_control_device in main.rs):
+    // flipped back before anything else can open a device.
+    api.set_open_exclusive(true);
+    let opened = info.open_device(&api);
+    api.set_open_exclusive(false);
+    opened.map_err(|e| e.to_string())
+}
+
+pub fn spawn_input_capture(ctrl: &Option<Arc<Mutex<HidDevice>>>) {
+    // Wheel / middle-click: Interface 2, whichever way main.rs managed to
+    // open it. Reading a shared (non-seized) handle still remaps, but the
+    // OS scrolls too — say so instead of silently double-acting.
+    match ctrl {
+        Some(ctrl) => {
+            let seized = ctrl.lock().unwrap().is_open_exclusive().unwrap_or(false);
+            if !seized {
+                eprintln!(
+                    "WARNING: Interface 2 is open but not seized — the wheel/middle-click remap \
+                     will fire alongside the OS's own scroll/middle-click."
+                );
+            }
+            let ctrl = Arc::clone(ctrl);
+            std::thread::Builder::new()
+                .name("tartarus-if2".into())
+                .spawn(move || if2_reader(ctrl))
+                .expect("spawn Interface 2 reader");
+        }
+        None => eprintln!("WARNING: Interface 2 not open — wheel/middle-click remap disabled."),
+    }
+
+    // D-pad / Hyper Response: Interface 0, keyboard usage, root only.
     if !is_root() {
         eprintln!(
-            "WARNING: not running as root — D-pad/wheel/middle-click remap and Hyper Shift are \
-             disabled (the Tartarus's own arrow/Option/wheel events pass through unmodified). \
-             Run with `sudo` to enable them. Analog keys keep working either way."
+            "WARNING: not running as root — D-pad remap and Hyper Shift are disabled (the \
+             Tartarus's own arrow/Option events pass through unmodified). Run with `sudo` to \
+             enable them. Analog keys and the wheel/middle-click remap keep working either way."
         );
     } else {
-        println!(
-            "Running as root, but the macOS D-pad/wheel/Hyper Shift capture is not implemented \
-             yet (docs/MACOS_PORT_PLAN.md Phase 3)."
-        );
+        match open_if0_seized() {
+            Ok(dev) => {
+                std::thread::Builder::new()
+                    .name("tartarus-if0".into())
+                    .spawn(move || if0_reader(dev))
+                    .expect("spawn Interface 0 reader");
+                println!(
+                    "macOS HID capture running: D-pad/wheel/middle-click remap + device-aware \
+                     Hypershift ({}). A real keyboard's Alt is never touched.",
+                    remap::describe_assignments()
+                );
+            }
+            Err(e) => eprintln!(
+                "WARNING: could not seize Interface 0 ({e}) — D-pad remap and Hyper Shift are \
+                 disabled; the Tartarus's own arrow/Option events pass through unmodified."
+            ),
+        }
     }
+    // Give the reader threads a moment to be scheduled before the analog
+    // loop starts hammering the lock (cosmetic: keeps startup logs ordered).
+    std::thread::sleep(Duration::from_millis(5));
 }
 
 // Inside a `.app` bundle the executable sits at
@@ -437,6 +659,53 @@ mod tests {
             assert_eq!(lg, rg);
             assert_ne!(ld, rd);
         }
+    }
+
+    #[test]
+    fn keyboard_report_diff_yields_arrow_and_alt_edges() {
+        let idle = [0u8; 8];
+        let up = [0, 0, HID_USAGE_UP, 0, 0, 0, 0, 0];
+        let up_right = [0, 0, HID_USAGE_UP, HID_USAGE_RIGHT, 0, 0, 0, 0];
+        let right = [0, 0, HID_USAGE_RIGHT, 0, 0, 0, 0, 0];
+        assert_eq!(keyboard_edges(&idle, &up), [KbdEdge::Arrow { dir: DpadDirection::Up, up: false }]);
+        // diagonal: second code appended, first still held
+        assert_eq!(
+            keyboard_edges(&up, &up_right),
+            [KbdEdge::Arrow { dir: DpadDirection::Right, up: false }]
+        );
+        // Up released while Right stays down (and shifts to slot 0)
+        assert_eq!(keyboard_edges(&up_right, &right), [KbdEdge::Arrow { dir: DpadDirection::Up, up: true }]);
+        assert_eq!(keyboard_edges(&right, &idle), [KbdEdge::Arrow { dir: DpadDirection::Right, up: true }]);
+        assert!(keyboard_edges(&idle, &idle).is_empty());
+
+        let alt = [BOOT_KBD_LALT, 0, 0, 0, 0, 0, 0, 0];
+        assert_eq!(keyboard_edges(&idle, &alt), [KbdEdge::HyperResponse { down: true }]);
+        assert_eq!(keyboard_edges(&alt, &idle), [KbdEdge::HyperResponse { down: false }]);
+        // Alt + arrow in one report: Alt edge first
+        let alt_left = [BOOT_KBD_LALT, 0, HID_USAGE_LEFT, 0, 0, 0, 0, 0];
+        assert_eq!(
+            keyboard_edges(&idle, &alt_left),
+            [KbdEdge::HyperResponse { down: true }, KbdEdge::Arrow { dir: DpadDirection::Left, up: false }]
+        );
+        // unknown keycodes are reported once, on press only
+        let other = [0, 0, 0x04, 0, 0, 0, 0, 0];
+        assert_eq!(keyboard_edges(&idle, &other), [KbdEdge::Unknown(0x04)]);
+        assert!(keyboard_edges(&other, &idle).is_empty());
+    }
+
+    #[test]
+    fn mouse_report_yields_wheel_and_middle_edges() {
+        assert_eq!(mouse_edges(0, 0, 1), [MouseEdge::Wheel(1)]);
+        assert_eq!(mouse_edges(0, 0, -1), [MouseEdge::Wheel(-1)]);
+        assert_eq!(mouse_edges(0, BOOT_MOUSE_MIDDLE, 0), [MouseEdge::Middle { up: false }]);
+        assert_eq!(mouse_edges(BOOT_MOUSE_MIDDLE, BOOT_MOUSE_MIDDLE, 0), []);
+        assert_eq!(mouse_edges(BOOT_MOUSE_MIDDLE, 0, 0), [MouseEdge::Middle { up: true }]);
+        assert_eq!(
+            mouse_edges(0, BOOT_MOUSE_MIDDLE, 1),
+            [MouseEdge::Wheel(1), MouseEdge::Middle { up: false }]
+        );
+        // other buttons (left/right) are ignored
+        assert!(mouse_edges(0, 0x01, 0).is_empty());
     }
 
     #[test]

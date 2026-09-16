@@ -1,7 +1,7 @@
 use hidapi::HidApi;
 use std::env;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock, RwLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::time::{Duration, Instant};
 
 mod config;
@@ -206,8 +206,8 @@ fn set_cfg(new_cfg: config::DriverConfig) {
     *CONFIG.write().unwrap() = Some(Arc::new(new_cfg));
 }
 
-const VID: u16 = 0x1532;
-const PID: u16 = 0x0244;
+pub(crate) const VID: u16 = 0x1532;
+pub(crate) const PID: u16 = 0x0244;
 
 // Interface 1 / endpoint 0x82 emits this report ID for the 20 analog keys.
 // Reverse-engineered via USBPcap capture on 2026-07-18 (docs/reference/logs/capture.pcap):
@@ -487,13 +487,50 @@ fn open_analog_devices(api: &HidApi) -> Vec<(i32, hidapi::HidDevice)> {
     devices
 }
 
-fn open_razer_control_device(api: &HidApi) -> Option<hidapi::HidDevice> {
+// Returned behind Arc<Mutex<..>> because on macOS this same handle is ALSO
+// the wheel/middle-click reader: Interface 2 must be seized there so the
+// OS stops scrolling on the Tartarus's wheel, and a seized IOHIDDevice
+// refuses feature reports from any OTHER handle in the process
+// (kIOReturnExclusiveAccess, verified 2026-09-16 with examples/mac_probe.rs
+// `dualif2`) — so lighting and the capture thread have to share one. On
+// Windows the mutex is simply never contended (Interception does the
+// wheel work in dpad.rs, on its own device).
+// `seize_for_capture`: macOS only — true from run_driver (the handle
+// doubles as the wheel/middle-click reader), false from configui's
+// best-effort unlock (a plain shared open; a calibration session must not
+// take the wheel away from the OS, and if the driver already holds the
+// seize, that unlock simply fails harmlessly). Ignored on other OSes.
+#[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
+pub(crate) fn open_razer_control_device(api: &HidApi, seize_for_capture: bool) -> Option<Arc<Mutex<hidapi::HidDevice>>> {
     let info = api
         .device_list()
         .find(|d| d.vendor_id() == VID && d.product_id() == PID && d.usage_page() == 0x0001 && d.usage() == 0x0002)?
         .clone();
-    match info.open_device(api) {
-        Ok(d) => Some(d),
+    // macOS: open Interface 2 exclusively (no root needed for a mouse-usage
+    // interface) so its wheel/middle-click reports reach only us. The
+    // exclusive flag is process-global in hidapi, hence flipped back
+    // immediately; if the seize fails (some other process holds the
+    // interface), fall back to a shared open so lighting still works and
+    // let platform::spawn_input_capture warn that the wheel isn't remapped.
+    #[cfg(target_os = "macos")]
+    let opened = if seize_for_capture {
+        api.set_open_exclusive(true);
+        let seized = info.open_device(api);
+        api.set_open_exclusive(false);
+        match seized {
+            Ok(d) => Ok(d),
+            Err(e) => {
+                eprintln!("[razer] Interface 2 could not be seized ({e}); opening shared instead.");
+                info.open_device(api)
+            }
+        }
+    } else {
+        info.open_device(api)
+    };
+    #[cfg(not(target_os = "macos"))]
+    let opened = info.open_device(api);
+    match opened {
+        Ok(d) => Some(Arc::new(Mutex::new(d))),
         Err(e) => {
             eprintln!("[razer] Interface 2 (Razer Control Device) open failed: {e}");
             if let Some(hint) = platform::hid_open_hint(&e) {
@@ -628,21 +665,22 @@ fn run_driver(run_forever: bool, duration_secs: u64) {
     // Kept open (not just a local inside this block) for the lifetime of the
     // function: the layer-indicator LED (below) needs to send a command on
     // every Hypershift press/release, using this same Interface 2 handle.
-    let ctrl = open_razer_control_device(&api);
+    let ctrl = open_razer_control_device(&api, true);
     match &ctrl {
         Some(ctrl) => {
+            let ctrl = ctrl.lock().unwrap();
             let cmd = build_razer_cmd(0x01, 0x00, 0x04, &[0x03, 0x00]);
             match ctrl.send_feature_report(&cmd) {
                 Ok(()) => println!("Sent device-mode-3 unlock command to Interface 2."),
                 Err(e) => eprintln!("WARNING: failed to send unlock command: {e} (analog data may not flow)"),
             }
             if let Some(lighting_cfg) = &cfg().lighting {
-                lighting::apply(ctrl, lighting_cfg);
+                lighting::apply(&ctrl, lighting_cfg);
             }
             if let Some(indicator) = &cfg().layer_indicator {
                 // Start in the "off" (Default layer) state; the loop below
                 // sends the "on" state the moment Hypershift is first held.
-                lighting::set_layer_indicator(ctrl, &indicator.color, false);
+                lighting::set_layer_indicator(&ctrl, &indicator.color, false);
             }
         }
         None => eprintln!("WARNING: Interface 2 (Razer Control Device) not found; analog data may not flow."),
@@ -670,7 +708,7 @@ fn run_driver(run_forever: bool, duration_secs: u64) {
     // dpad::run_interception_thread only falls back to
     // hypershift::spawn_hypershift_hook_thread() itself, internally, if
     // Interception isn't installed/running.
-    platform::spawn_input_capture();
+    platform::spawn_input_capture(&ctrl);
 
     // NOTE: reading these HidDevice handles from a *different* thread than the
     // one that opened them silently returned zero reports in testing on
@@ -713,11 +751,12 @@ fn run_driver(run_forever: bool, duration_secs: u64) {
                         force_keyup_on_layer_change(&mut pressed_vk, start);
                         hypershift::CURRENT_LAYER.store(0, Ordering::SeqCst);
                         if let Some(ctrl) = &ctrl {
+                            let ctrl = ctrl.lock().unwrap();
                             if let Some(lighting_cfg) = &cfg().lighting {
-                                lighting::apply(ctrl, lighting_cfg);
+                                lighting::apply(&ctrl, lighting_cfg);
                             }
                             if let Some(indicator) = &cfg().layer_indicator {
-                                lighting::set_layer_indicator(ctrl, &indicator.color, false);
+                                lighting::set_layer_indicator(&ctrl, &indicator.color, false);
                             }
                         }
                     }
@@ -739,7 +778,7 @@ fn run_driver(run_forever: bool, duration_secs: u64) {
             && let Some(ctrl) = &ctrl
             && let Some(indicator) = &cfg().layer_indicator
         {
-            lighting::set_layer_indicator(ctrl, &indicator.color, layer != 0);
+            lighting::set_layer_indicator(&ctrl.lock().unwrap(), &indicator.color, layer != 0);
         }
         // Force-send KeyUp for every key still logically down, but ONLY on
         // the transition back to Default (from any other layer) — NOT on
