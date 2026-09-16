@@ -18,16 +18,22 @@
 //
 // Backends:
 //   windows.rs  the original, hardware-verified SendInput / Win32 code
-//   stub.rs     everything else: logs instead of emitting, so the pure
-//               logic + `cargo test` run on any dev box (Linux CI, or a
-//               Mac before its real backend lands)
+//   macos.rs    CoreGraphics/IOKit backend (in progress — see
+//               docs/MACOS_PORT_PLAN.md; currently a compiling skeleton)
+//   stub.rs     everything else (Linux dev boxes / CI): logs instead of
+//               emitting, so the pure logic + `cargo test` run anywhere
 
 #[cfg(windows)]
 mod windows;
 #[cfg(windows)]
 pub use self::windows::*;
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(target_os = "macos")]
+pub use self::macos::*;
+
+#[cfg(not(any(windows, target_os = "macos")))]
 mod stub;
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 pub use self::stub::*;
