@@ -126,6 +126,11 @@ fn init_log_file() {
     }
     match std::fs::File::create(&path) {
         Ok(mut file) => {
+            // Under `sudo` (macOS D-pad mode) anything created here must
+            // stay writable by the user for their next non-sudo launch.
+            for p in [Some(app_root()), path.parent().map(|p| p.to_path_buf()), Some(path.clone())].into_iter().flatten() {
+                platform::give_back_to_sudo_user(&p);
+            }
             let (tx, rx) = std::sync::mpsc::channel::<String>();
             let _ = LOG_SENDER.set(tx);
             std::thread::spawn(move || {

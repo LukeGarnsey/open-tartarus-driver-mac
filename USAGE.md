@@ -210,7 +210,7 @@ Inside a bundle the path is `"/Applications/Tartarus Driver.app/Contents/MacOS/t
 
 #### Files
 
-When run from the `.app`, `config.toml` and `logs/run.log` live in **`~/Library/Application Support/open-tartarus-driver/`** (writing inside the bundle would break its signature and with it the permission grants). Run as a bare binary, they sit next to it (or at the repo root for a `cargo run`), exactly as on Windows.
+When run from the `.app`, `config.toml` and `logs/run.log` live in **`~/Library/Application Support/open-tartarus-driver/`** (writing inside the bundle would break its signature and with it the permission grants). Run as a bare binary, they sit next to it (or at the repo root for a `cargo run`), exactly as on Windows. A `sudo` run uses the same files (macOS keeps your `$HOME` under `sudo`), and anything it creates is handed back to your user so a later non-`sudo` launch or config save still works.
 
 #### Key names
 
@@ -436,7 +436,7 @@ macOS用のzipを展開し、**`Tartarus Driver.app`**を好きな場所(例: `/
 
 #### ファイルの場所
 
-`.app`から起動した場合、`config.toml`と`logs/run.log`は**`~/Library/Application Support/open-tartarus-driver/`**に置かれる(バンドル内に書き込むと署名が壊れ、権限の許可も無効になるため)。素のバイナリとして起動した場合はその隣(`cargo run`ならリポジトリのルート)に置かれ、Windowsと同じ。
+`.app`から起動した場合、`config.toml`と`logs/run.log`は**`~/Library/Application Support/open-tartarus-driver/`**に置かれる(バンドル内に書き込むと署名が壊れ、権限の許可も無効になるため)。素のバイナリとして起動した場合はその隣(`cargo run`ならリポジトリのルート)に置かれ、Windowsと同じ。`sudo`で起動しても同じファイルを使い(macOSの`sudo`は`$HOME`を引き継ぐ)、`sudo`実行中に作成されたファイルは所有者を元のユーザーに戻すので、その後`sudo`なしで起動したり設定を保存したりしても問題ない。
 
 #### キー名
 

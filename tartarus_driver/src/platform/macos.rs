@@ -585,6 +585,25 @@ pub fn spawn_input_capture(ctrl: &Option<Arc<Mutex<HidDevice>>>) {
     std::thread::sleep(Duration::from_millis(5));
 }
 
+// `sudo` keeps $HOME on macOS, so a root-launched driver reads and writes
+// the invoking user's config.toml / logs — the documented way to get the
+// D-pad half. But any file root *creates* there would be owned by root,
+// and the next non-sudo launch (or a save from configui) could no longer
+// write it. sudo records who invoked it in SUDO_UID/SUDO_GID; hand the
+// file back to them. No-op when not root or not under sudo.
+pub fn give_back_to_sudo_user(path: &std::path::Path) {
+    if !is_root() {
+        return;
+    }
+    let id = |var: &str| std::env::var(var).ok().and_then(|v| v.parse::<u32>().ok());
+    let (Some(uid), Some(gid)) = (id("SUDO_UID"), id("SUDO_GID")) else {
+        return;
+    };
+    if let Err(e) = std::os::unix::fs::chown(path, Some(uid), Some(gid)) {
+        eprintln!("WARNING: could not hand {} back to uid {uid}: {e}", path.display());
+    }
+}
+
 // Inside a `.app` bundle the executable sits at
 // Foo.app/Contents/MacOS/<exe>; writing config.toml / logs/ next to it
 // would modify the bundle and break its code signature (and with it the

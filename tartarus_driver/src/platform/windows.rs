@@ -129,6 +129,9 @@ pub fn open_url(url: &str) {
 // Windows needs no runtime permission for SendInput or HID reads.
 pub fn check_input_permissions() {}
 
+// Only macOS has the "launched via sudo but files belong to the user" case.
+pub fn give_back_to_sudo_user(_path: &std::path::Path) {}
+
 pub fn hid_open_hint(_err: &hidapi::HidError) -> Option<&'static str> {
     None
 }

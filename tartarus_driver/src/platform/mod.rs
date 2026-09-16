@@ -12,6 +12,8 @@
 //   check_input_permissions()  log (and on macOS, prompt for) whatever OS
 //                              permission synthetic input needs; no-op
 //                              where none is needed
+//   give_back_to_sudo_user(p)  macOS: chown a file/dir this process created
+//                              to the user who ran `sudo`; no-op elsewhere
 //   hid_open_hint(&err)        an extra, OS-specific sentence to log when a
 //                              HID open fails (macOS: the Input Monitoring
 //                              grant), or None

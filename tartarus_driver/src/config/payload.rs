@@ -215,8 +215,13 @@ impl ConfigPayload {
     /// validate()s, then overwrites config.toml wholesale on success.
     pub fn validate_and_save(&self) -> Result<(), String> {
         self.validate()?;
-        std::fs::write(crate::config_path(), self.to_toml_string())
-            .map_err(|e| format!("config.tomlへの書き込みに失敗しました: {e}"))
+        let path = crate::config_path();
+        std::fs::write(&path, self.to_toml_string())
+            .map_err(|e| format!("config.tomlへの書き込みに失敗しました: {e}"))?;
+        // A config first saved while running under `sudo` (macOS) must not
+        // end up root-owned, or the next non-sudo save fails.
+        crate::platform::give_back_to_sudo_user(&path);
+        Ok(())
     }
 
     fn to_toml_string(&self) -> String {
