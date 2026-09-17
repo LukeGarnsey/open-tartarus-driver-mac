@@ -7,8 +7,9 @@
 <a name="english"></a>
 ## English
 
-### Unreleased
+### v1.2.1
 
+- **Fixed**: `cargo test` could type real keystrokes into the focused window (the emulate harness test reaches the key pipeline; with the macOS backend this posted four "5"s). Tests now use a logging stand-in for key emission on every OS. No change to the shipped driver.
 - **Changed** (`configui`): gradient-filled sliders; the release (t_off) slider now follows the press (t_on) slider in both directions instead of sticking, with a note saying it stays below t_on; the Layer indicator card is marked experimental (the Tartarus Pro accepts the command but the side LED doesn't visibly change — see `research.md`) with an amber caution block; status icons match the instruction-block icon style; key 20 is drawn narrower, closer to the device.
 
 ### v1.2.0
@@ -83,8 +84,9 @@ Initial public release.
 <a name="japanese"></a>
 ## 日本語
 
-### 未リリース
+### v1.2.1
 
+- **修正**: `cargo test` がフォーカス中のウィンドウに実際のキー入力を送ってしまうことがあった(エミュレータのテストがキー送出経路まで到達するため。macOSでは「5」が4回入力された)。テストではキー送出をログ出力に置き換えるようにした(全OS共通)。配布するドライバに変更はない。
 - **変更**(`configui`): スライダーをグラデーション表示に。解放判定(t_off)のスライダーが押下判定(t_on)に双方向で追従するようになり(以前は引っかかることがあった)、t_onより小さい旨の注記を追加。レイヤーインジケータのカードを実験的機能として明記(Tartarus Proはコマンドを受け付けるが側面LEDは見た目に変化しない。`research.md`参照)し、注意喚起の琥珀色ブロックに変更。状態表示のアイコンを説明ブロックのアイコンと同じスタイルに統一。キー20の描画幅を実機に近づけて狭く。
 
 ### v1.2.0
