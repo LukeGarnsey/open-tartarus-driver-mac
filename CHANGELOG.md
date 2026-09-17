@@ -7,7 +7,7 @@
 <a name="english"></a>
 ## English
 
-### Unreleased
+### v1.2.2
 
 - **Added** (`configui`): an **Undo changes** button in the header that reverts every unsaved edit to the last saved config.
 
@@ -88,7 +88,7 @@ Initial public release.
 <a name="japanese"></a>
 ## 日本語
 
-### 未リリース
+### v1.2.2
 
 - **追加**(`configui`): ヘッダーに**変更を取り消す**ボタンを追加。未保存の編集をすべて最後に保存した状態に戻す。
 
