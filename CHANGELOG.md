@@ -7,6 +7,10 @@
 <a name="english"></a>
 ## English
 
+### Unreleased
+
+- **Changed** (`configui`): gradient-filled sliders; the release (t_off) slider now follows the press (t_on) slider in both directions instead of sticking, with a note saying it stays below t_on; the Layer indicator card is marked experimental (the Tartarus Pro accepts the command but the side LED doesn't visibly change — see `research.md`) with an amber caution block; status icons match the instruction-block icon style; key 20 is drawn narrower, closer to the device.
+
 ### v1.2.0
 
 - **Changed**: the `configui` settings page is redesigned. It now draws the keypad — click a key, D-pad direction, the wheel or the thumb button to assign it from a searchable, categorised key picker (modifiers shown with their symbols on macOS) — with Default / Layer 1 / Layer 2 tabs, a List view of every control and layer, live key depth shown on the keypad itself, per-section instructions, a header chip for the unsaved/saved state, and a Driver status card (new `/api/status` endpoint; reports root/`sudo` state on macOS when the page is served by the tray-mode driver). Same `config.toml`, same driver behaviour.
@@ -78,6 +82,10 @@ Initial public release.
 
 <a name="japanese"></a>
 ## 日本語
+
+### 未リリース
+
+- **変更**(`configui`): スライダーをグラデーション表示に。解放判定(t_off)のスライダーが押下判定(t_on)に双方向で追従するようになり(以前は引っかかることがあった)、t_onより小さい旨の注記を追加。レイヤーインジケータのカードを実験的機能として明記(Tartarus Proはコマンドを受け付けるが側面LEDは見た目に変化しない。`research.md`参照)し、注意喚起の琥珀色ブロックに変更。状態表示のアイコンを説明ブロックのアイコンと同じスタイルに統一。キー20の描画幅を実機に近づけて狭く。
 
 ### v1.2.0
 

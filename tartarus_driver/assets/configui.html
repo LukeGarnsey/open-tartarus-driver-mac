@@ -119,6 +119,9 @@
   }
   .hint svg { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 2px; stroke: var(--hint-icon); }
   .hint p { margin: 0; }
+  /* amber variant: a caution, e.g. an experimental feature */
+  .hint.caution { background: var(--warn-bg); border-color: var(--warn-border); }
+  .hint.caution svg { stroke: var(--warn); }
 
   /* ---------- keypad ---------- */
   .keypad-wrap { display: flex; flex-wrap: wrap; gap: 28px 36px; align-items: flex-start; padding: 8px 0 4px; }
@@ -232,10 +235,22 @@
     padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; font-size: 13px;
   }
   input[type="color"] { width: 40px; height: 30px; padding: 2px; }
-  input[type="range"] { flex: 1 1 auto; accent-color: var(--accent); }
+  /* range sliders: gradient fill up to the value (set as --pct by JS) */
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none; flex: 1 1 auto; height: 6px; margin: 8px 0; border-radius: 3px; padding: 0; border: none;
+    background: linear-gradient(to right, #7c3aed 0%, #db2777 var(--pct, 50%), var(--border) var(--pct, 50%), var(--border) 100%);
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 1px solid var(--border-strong); box-shadow: 0 1px 3px rgba(0,0,0,0.25); cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 1px solid var(--border-strong); box-shadow: 0 1px 3px rgba(0,0,0,0.25); cursor: pointer; }
+  input[type="range"]::-moz-range-track { background: transparent; }
+  input[type="range"]:focus-visible { box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.25); }
   .slider { display: flex; flex-direction: column; gap: 6px; flex: 1 1 240px; }
   .slider .top { display: flex; justify-content: space-between; font-size: 12px; }
   .slider .top span:first-child { color: var(--muted); }
+  .note-warn { color: #e8760a; }
   .slider .top span:last-child { font-variant-numeric: tabular-nums; }
   .sliders { display: flex; flex-wrap: wrap; gap: 16px 24px; }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; }
@@ -256,18 +271,20 @@
 
   /* ---------- status components ---------- */
   .status { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); }
-  .status .ico { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; color: #fff; }
-  .status .ico svg { width: 14px; height: 14px; }
+  .status .ico { display: inline-flex; flex: 0 0 auto; margin-top: 2px; }
+  .status .ico svg { width: 16px; height: 16px; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .status .body { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; }
   .status .title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 600; }
   .status .badge { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; color: #fff; }
   .status.ok { background: var(--ok-bg); border-color: var(--ok-border); }
-  .status.ok .ico, .status.ok .badge { background: var(--ok); }
+  .status.ok .ico svg { stroke: var(--ok); }
+  .status.ok .badge { background: var(--ok); }
   .status.ok .title { color: var(--ok-text); }
   .status.warn { background: var(--warn-bg); border-color: var(--warn-border); }
-  .status.warn .ico, .status.warn .badge { background: var(--warn); color: #1d1d1f; }
+  .status.warn .ico svg { stroke: var(--warn); }
+  .status.warn .badge { background: var(--warn); color: #1d1d1f; }
   .status.warn .title { color: var(--warn-text); }
-  .status.info .ico { background: var(--muted); }
+  .status.info .ico svg { stroke: var(--muted); }
   .status.info .badge { background: var(--muted); }
   .status .body a { font-size: 13px; margin-top: 4px; }
   .status .body .d { color: var(--text); }
@@ -392,7 +409,7 @@
           <input type="range" id="t-on" min="1" max="255">
         </div>
         <div class="slider">
-          <div class="top"><span data-i18n="tOff">Release at (t_off)</span><span><b id="t-off-val"></b> / 255</span></div>
+          <div class="top"><span><span data-i18n="tOff">Release at (t_off)</span> <span class="note-warn" data-i18n="tOffNote">* stays below t_on</span></span><span><b id="t-off-val"></b> / 255</span></div>
           <input type="range" id="t-off" min="0" max="254">
         </div>
       </div>
@@ -480,8 +497,8 @@
         <h2 data-i18n="cardIndicator">Layer indicator LED</h2>
         <button type="button" class="switch" id="indicator-switch" aria-pressed="false"></button>
       </div>
-      <div class="hint">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg>
+      <div class="hint caution">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9.5 16.5H2.5L12 3z"></path><path d="M12 10v4M12 17h.01"></path></svg>
         <p data-i18n-html="hintIndicator"></p>
       </div>
       <div class="row" id="indicator-color-row">
@@ -553,6 +570,7 @@ const I18N = {
     hintActuation: 'A key counts as pressed once it travels past <b>t_on</b> and released once it comes back above <b>t_off</b> (0–255). Keep t_off below t_on to avoid chatter. Turn on <b>Show live key depth</b> above to watch each key\'s travel on the keypad while you press it.',
     tOn: "Press at (t_on)",
     tOff: "Release at (t_off)",
+    tOffNote: "* stays below t_on",
     perKeyToggle: "Per-key overrides & live depth ▾",
     thKey: "Key",
     thCurrent: "Current",
@@ -576,7 +594,7 @@ const I18N = {
     dirLeft: "Left", dirRight: "Right",
     speed: "Speed (1–4)",
     cardIndicator: "Layer indicator LED",
-    hintIndicator: "Lights one of the keypad's three side LEDs whenever a layer other than Default is active, so you can see which layer you're on.",
+    hintIndicator: '<b>Experimental.</b> Meant to light one of the keypad\'s three side LEDs whenever a layer other than Default is active. The command is documented for sibling Razer devices, but on every Tartarus Pro tested so far the keypad accepts it and <b>nothing visibly changes</b> — the side light keeps its own colour. Harmless to leave on; just don\'t expect it to work (details in <code>research.md</code>).',
     cardStatus: "Driver status",
     stActive: "Active",
     stRunning: "Running",
@@ -647,6 +665,7 @@ const I18N = {
     hintActuation: 'キーの押し込みが <b>t_on</b> を超えると押下、<b>t_off</b> を下回ると解放と判定します(0〜255)。チャタリングを防ぐため t_off は t_on より小さくしてください。上の<b>押し込み深さを表示</b>をオンにすると、キーを押したときの深さがキーパッド上に表示されます。',
     tOn: "押下判定 (t_on)",
     tOff: "解放判定 (t_off)",
+    tOffNote: "* 常に t_on より小さい",
     perKeyToggle: "キー別の個別設定と押し込み深さ ▾",
     thKey: "キー",
     thCurrent: "現在値",
@@ -670,7 +689,7 @@ const I18N = {
     dirLeft: "左", dirRight: "右",
     speed: "速度 (1〜4)",
     cardIndicator: "レイヤーインジケータLED",
-    hintIndicator: "通常以外のレイヤーが有効な間、側面の3つのLEDのうち1つを点灯させ、どのレイヤーにいるかを示します。",
+    hintIndicator: '<b>実験的機能。</b>通常以外のレイヤーが有効な間、側面の3つのLEDのうち1つを点灯させることを意図しています。コマンド自体は同系のRazer製品で確認されていますが、これまで試したTartarus Proではキーパッドはコマンドを受け付けるものの<b>見た目には何も変わりません</b>(側面のライトは元の色のまま)。オンにしても害はありませんが、動作は期待しないでください(詳細は<code>research.md</code>)。',
     cardStatus: "ドライバの状態",
     stActive: "動作中",
     stRunning: "稼働中",
@@ -758,6 +777,11 @@ function overrideCount() { return state.per_key_t_on.filter((v, i) => v != null 
 // Rendering
 // ===========================================================================
 function $(id) { return document.getElementById(id); }
+function setRange(id, value) {
+  const r = $(id); r.value = value;
+  const pct = (Number(value) - Number(r.min)) / (Number(r.max) - Number(r.min)) * 100;
+  r.style.setProperty('--pct', pct + '%');
+}
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
 function applyLanguage() {
@@ -809,7 +833,7 @@ const KEY_GEOM = (() => {
   const rows = [[0, 0, 5], [14, 64, 5], [28, 128, 5], [42, 192, 4]];
   const g = [];
   for (const [ox, y, n] of rows) for (let i = 0; i < n; i++) g.push({ x: ox + i * 64, y, w: 56 });
-  g.push({ x: 56, y: 264, w: 248 });
+  g.push({ x: 56, y: 264, w: 100 });
   return g;
 })();
 
@@ -914,8 +938,8 @@ function renderList() {
 }
 
 function renderActuation() {
-  $('t-on').value = state.t_on; $('t-on-val').textContent = state.t_on;
-  $('t-off').value = state.t_off; $('t-off-val').textContent = state.t_off;
+  setRange('t-on', state.t_on); $('t-on-val').textContent = state.t_on;
+  setRange('t-off', state.t_off); $('t-off-val').textContent = state.t_off;
   $('override-count').textContent = t('overrides') + overrideCount();
   const body = $('perkey-body');
   body.replaceChildren();
@@ -963,7 +987,7 @@ function renderLighting() {
   document.querySelectorAll('#effect-chips button').forEach(b => b.classList.toggle('active', b.dataset.effect === fx));
   $('lighting-color').value = '#' + state.lighting_color.toLowerCase();
   $('lighting-color-hex').textContent = '#' + state.lighting_color.toUpperCase();
-  $('lighting-brightness').value = state.lighting_brightness; $('lighting-brightness-val').textContent = state.lighting_brightness;
+  setRange('lighting-brightness', state.lighting_brightness); $('lighting-brightness-val').textContent = state.lighting_brightness;
   $('lighting-direction').value = state.lighting_wave_direction;
   $('lighting-speed').value = state.lighting_reactive_speed;
   $('color-row').hidden = !['static', 'breathing', 'reactive'].includes(fx);
@@ -983,9 +1007,12 @@ function renderIndicator() {
 function statusBlock(kind, title, badge, detailHtml, link) {
   const s = el('div', 'status ' + kind);
   const ico = el('span', 'ico');
-  ico.innerHTML = kind === 'ok'
-    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>'
-    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v6M12 17h.01"></path></svg>';
+  const glyph = {
+    ok: '<circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.5l2.5 2.5 4.5-5"></path>',
+    warn: '<path d="M12 3l9.5 16.5H2.5L12 3z"></path><path d="M12 10v4M12 17h.01"></path>',
+    info: '<circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path>',
+  }[kind];
+  ico.innerHTML = '<svg viewBox="0 0 24 24">' + glyph + '</svg>';
   const body = el('div', 'body');
   const tt = el('div', 'title'); tt.appendChild(el('span', null, title)); if (badge) tt.appendChild(el('span', 'badge', badge));
   const d = el('div', 'd'); d.innerHTML = detailHtml;
@@ -1177,14 +1204,19 @@ function wire() {
   document.querySelectorAll('#layer-seg button').forEach(b => b.addEventListener('click', () => { const l = Number(b.dataset.layer); if (l < reachableLayers()) { ui.layer = l; closePicker(); renderKeypad(); } }));
   $('depth-switch').addEventListener('click', () => setLiveDepth(!ui.calib));
   $('copy-l1').addEventListener('click', () => { if (confirm(t('copyConfirm'))) { state.keys_layer1 = state.keys_default.slice(); renderList(); renderChip(); } });
-  const onT = () => { state.t_on = Number($('t-on').value); state.t_off = Math.min(Number($('t-off').value), state.t_on - 1); renderActuation(); renderChip(); };
-  $('t-on').addEventListener('input', onT); $('t-off').addEventListener('input', onT);
+  // t_off must stay below t_on (hysteresis). Whichever slider is being
+  // dragged wins and pushes the other one along, so neither ever sticks.
+  const syncT = () => { setRange('t-on', state.t_on); setRange('t-off', state.t_off); $('t-on-val').textContent = state.t_on; $('t-off-val').textContent = state.t_off; renderChip(); };
+  $('t-on').addEventListener('input', () => { state.t_on = Number($('t-on').value); if (state.t_off >= state.t_on) state.t_off = state.t_on - 1; syncT(); });
+  $('t-off').addEventListener('input', () => { state.t_off = Number($('t-off').value); if (state.t_on <= state.t_off) state.t_on = Math.min(255, state.t_off + 1); syncT(); });
+  const refreshPerKeyDefaults = () => renderActuation();
+  $('t-on').addEventListener('change', refreshPerKeyDefaults); $('t-off').addEventListener('change', refreshPerKeyDefaults);
   document.querySelectorAll('#hs-mode-seg button').forEach(b => b.addEventListener('click', () => { state.hypershift_mode = b.dataset.mode; closePicker(); renderHypershift(); renderKeysCard(); renderChip(); }));
   $('hs-style').addEventListener('change', () => { state.hypershift_switch_style = $('hs-style').value; renderHypershift(); renderKeysCard(); renderChip(); });
   $('hs-count').addEventListener('change', () => { state.hypershift_layer_count = Number($('hs-count').value); renderHypershift(); renderKeysCard(); renderChip(); });
   document.querySelectorAll('#effect-chips button').forEach(b => b.addEventListener('click', () => { state.lighting_effect = b.dataset.effect; renderLighting(); renderChip(); }));
   $('lighting-color').addEventListener('input', () => { state.lighting_color = $('lighting-color').value.replace('#', '').toUpperCase(); $('lighting-color-hex').textContent = '#' + state.lighting_color; renderChip(); });
-  $('lighting-brightness').addEventListener('input', () => { state.lighting_brightness = Number($('lighting-brightness').value); $('lighting-brightness-val').textContent = state.lighting_brightness; renderChip(); });
+  $('lighting-brightness').addEventListener('input', () => { state.lighting_brightness = Number($('lighting-brightness').value); setRange('lighting-brightness', state.lighting_brightness); $('lighting-brightness-val').textContent = state.lighting_brightness; renderChip(); });
   $('lighting-direction').addEventListener('change', () => { state.lighting_wave_direction = $('lighting-direction').value; renderChip(); });
   $('lighting-speed').addEventListener('change', () => { state.lighting_reactive_speed = Number($('lighting-speed').value); renderChip(); });
   $('indicator-switch').addEventListener('click', () => { state.layer_indicator_enabled = !state.layer_indicator_enabled; renderIndicator(); renderChip(); });
