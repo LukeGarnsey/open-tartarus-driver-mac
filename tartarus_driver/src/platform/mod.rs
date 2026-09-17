@@ -49,3 +49,20 @@ pub use self::macos::*;
 mod stub;
 #[cfg(not(any(windows, target_os = "macos")))]
 pub use self::stub::*;
+
+// Test builds never emit. A couple of tests (emulate.rs's command
+// dispatcher, for one) drive the full key pipeline, which ends in
+// send_key; with a real backend that typed actual keystrokes into
+// whatever window had focus while `cargo test` ran (observed on macOS
+// 2026-09-17: four "5"s from the emulate test landing in the terminal).
+// A local item shadows the glob re-export above, so under cfg(test) every
+// caller gets this logging stand-in instead of the OS backend — on every
+// OS, Windows included.
+#[cfg(test)]
+pub fn send_key(key: crate::key::Key, key_up: bool) {
+    crate::println!(
+        "[test] send_key {} {} (suppressed: tests never emit real keystrokes)",
+        key.name(),
+        if key_up { "UP" } else { "DOWN" }
+    );
+}

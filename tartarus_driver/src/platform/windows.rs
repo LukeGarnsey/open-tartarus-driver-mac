@@ -3,6 +3,11 @@
 // Behaviour is unchanged — every call site just goes through
 // crate::platform now.
 
+// Under `cargo test` platform/mod.rs shadows send_key with a logging
+// stand-in (tests must never type), which leaves this backend's emission
+// path unused in that build only.
+#![cfg_attr(test, allow(dead_code))]
+
 use crate::key::Key;
 use crate::{eprintln, SHUTDOWN_REQUESTED};
 use std::sync::atomic::Ordering;

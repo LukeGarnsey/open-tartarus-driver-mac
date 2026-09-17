@@ -3,6 +3,11 @@
 // logged instead of sent, so the whole analog/hysteresis/layer/config
 // pipeline — and `cargo test` — runs unchanged without any OS input API.
 
+// Under `cargo test` platform/mod.rs shadows send_key with a logging
+// stand-in (tests must never type), which leaves this backend's emission
+// path unused in that build only.
+#![cfg_attr(test, allow(dead_code))]
+
 use crate::key::Key;
 use crate::{eprintln, println, SHUTDOWN_REQUESTED};
 use std::sync::atomic::Ordering;

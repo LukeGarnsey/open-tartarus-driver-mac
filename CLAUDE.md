@@ -83,9 +83,11 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
   `key.rs`) + `NSEvent` SystemDefined subtype 8 for media keys. Don't adopt
   `enigo` (no L/R Alt or L/R Cmd distinction). `F21-F24` and `MEDIA_STOP`
   are `MacKey::Unsupported`.
-- Tests must never emit real keystrokes. `cargo test` on Windows calls the
-  real `SendInput` if a test reaches `send_key` — keep bookkeeping tests
-  pure (see `remap::track_held`).
+- Tests must never emit real keystrokes. `platform/mod.rs` shadows
+  `send_key` with a logging stand-in under `cfg(test)` on every OS (added
+  after `cargo test` on macOS typed four "5"s into the terminal via the
+  emulate test) — keep it that way, and keep bookkeeping tests pure
+  regardless (see `remap::track_held`).
 
 ## macOS gotchas
 

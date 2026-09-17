@@ -60,6 +60,11 @@
 // Tests never reach send_key (same rule as Windows): the modifier
 // bookkeeping is a pure function (`next_flags`) tested on its own.
 
+// Under `cargo test` platform/mod.rs shadows send_key with a logging
+// stand-in (tests must never type), which leaves this backend's emission
+// path unused in that build only.
+#![cfg_attr(test, allow(dead_code))]
+
 use crate::key::{Key, MacKey};
 use crate::remap::{self, DpadDirection};
 use crate::{eprintln, println, SHUTDOWN_REQUESTED};
