@@ -101,9 +101,11 @@ cd tartarus_driver
 cargo run --release -- configui
 ```
 
-Open the URL shown in the console (`http://127.0.0.1:7878/`) in your browser. You'll see pickers for the 20 analog keys (Default/Layer1/Layer2 each), a "Hyper Shift" panel (mode/switch style/layer count/modifier key), the D-pad, the wheel, and middle-click — pick the keys you want and click "Save". Each key picker has a small category dropdown next to it ("Basic" or "Media Control") to narrow the list before picking the actual key.
+Open the URL shown in the console (`http://127.0.0.1:7878/`) in your browser. The page draws the keypad: click any key, D-pad direction, the wheel, or the thumb button to open a key picker (categories: Modifiers, Letters, Numbers, F-keys, Navigation, Punctuation, Media — or just type to search), pick what it should send, and click "Save" in the header. The **Default / Layer 1 / Layer 2** tabs above the keypad switch which layer you're editing; layers the current Hyper Shift settings can't reach are struck through. The **List** view shows every control and every layer in one table, with a "Copy Default → Layer 1" shortcut. Each section starts with a short explanation, and the header chip tells you whether there are unsaved changes.
 
-The page itself has a language switcher (top right, English/日本語). Switching it re-translates the page immediately and is saved right away (independent of the "Save" button below) — it's remembered the next time you open `configui`, in `config.toml`'s `[configui]` section. Defaults to English.
+**Show live key depth** (top of the key card) starts a live read of the keypad: each key fills from the bottom as you press it, and the "Per-key overrides & live depth" panel under Actuation shows the numbers and lets you set a per-key `t_on`/`t_off`. Hyper Shift, Lighting and the Layer indicator LED have their own cards on the right; the **Driver status** card reports whether the driver is running with full features (on macOS: whether it was started with `sudo`) — when the page is started on its own with the `configui` subcommand it only says "Settings page only", since it isn't the driver.
+
+The language switcher (EN / 日本語, top right) re-translates the page immediately and is saved right away (independent of the "Save" button) — it's remembered the next time you open `configui`, in `config.toml`'s `[configui]` section. Defaults to English.
 
 **Notes**:
 - `configui` is not the driver itself — it's only a config editor. It never reads HID data or sends keystrokes.
@@ -328,9 +330,11 @@ cd tartarus_driver
 cargo run --release -- configui
 ```
 
-コンソールに表示されるURL(`http://127.0.0.1:7878/`)をブラウザで開く。20個のアナログキー(通常レイヤー・Layer1・Layer2それぞれ)、「ハイパーシフト」パネル(モード・切替方式・レイヤー数・修飾キー)、十字キー、ホイール、ホイールクリックのピッカーが並んでいるので、割り当てたいキーを選んで「保存」を押す。各キーピッカーには「基本」「メディア操作」のカテゴリ選択が付いており、先にカテゴリを絞ってから実際のキーを選べる。
+コンソールに表示されるURL(`http://127.0.0.1:7878/`)をブラウザで開く。ページにはキーパッドの絵が表示される。キー・十字キーの方向・ホイール・親指ボタンのどれかをクリックするとキーピッカーが開く(カテゴリ: 修飾キー・英字・数字・ファンクション・ナビゲーション・記号・メディア。文字を入力して検索もできる)ので、送信したいキーを選び、ヘッダーの「保存」を押す。キーパッド上部の**通常 / Layer 1 / Layer 2**タブで編集するレイヤーを切り替える(現在のハイパーシフト設定で到達できないレイヤーは取り消し線で表示)。**一覧**表示にすると、すべての操作部とレイヤーが1つの表に並び、「通常 → Layer 1 にコピー」も使える。各セクションの先頭には短い説明があり、ヘッダーのチップで未保存の変更があるかどうかが分かる。
 
-ページ右上に言語切り替え(English/日本語)がある。切り替えるとその場でページ全体が翻訳され、即座に保存される(下の「保存」ボタンとは独立)。次回`configui`を開いたときも覚えている(`config.toml`の`[configui]`セクションに記録)。既定は英語。
+キーカード上部の**押し込み深さを表示**をオンにすると、キーパッドからの読み取りが始まり、押したキーが下から塗りつぶされる。「アクチュエーション」の「キー別の個別設定と押し込み深さ」パネルで数値を確認し、キーごとの`t_on`/`t_off`を設定できる。ハイパーシフト・ライティング・レイヤーインジケータLEDは右側のカードにまとまっている。**ドライバの状態**カードは、ドライバが全機能で動いているか(macOSなら`sudo`で起動されたか)を表示する。`configui`サブコマンドでこのページを単独起動した場合はドライバ本体ではないため「設定ページのみ」と表示される。
+
+言語切り替え(EN / 日本語、右上)は、切り替えるとその場でページ全体が翻訳され、即座に保存される(「保存」ボタンとは独立)。次回`configui`を開いたときも覚えている(`config.toml`の`[configui]`セクションに記録)。既定は英語。
 
 **注意点**:
 - `configui`はドライバ本体ではない。設定画面を出すだけで、HID読み取りやキー送信は一切行わない。

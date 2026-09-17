@@ -323,6 +323,25 @@ fn handle_request(request: tiny_http::Request) {
         (Method::Get, "/api/version") => {
             request.respond(json_response(format!("{{\"version\":{:?}}}", crate::VERSION), 200))
         }
+        // What the page's "Driver status" card shows. `embedded` = this
+        // server runs inside the driver process (`tray` mode), so `root`
+        // describes the driver itself; standalone `configui` can only say
+        // "not the driver". `root` is only meaningful on macOS, where the
+        // D-pad / Hyper Shift capture needs it (see platform/macos.rs).
+        (Method::Get, "/api/status") => {
+            let embedded = crate::CONFIGUI_EMBEDDED.load(std::sync::atomic::Ordering::SeqCst);
+            #[cfg(target_os = "macos")]
+            let root = crate::platform::is_root();
+            #[cfg(not(target_os = "macos"))]
+            let root = true;
+            request.respond(json_response(
+                format!(
+                    "{{\"platform\":{:?},\"embedded\":{embedded},\"root\":{root}}}",
+                    std::env::consts::OS
+                ),
+                200,
+            ))
+        }
         (Method::Get, "/api/config") => {
             let cfg: DriverConfig = crate::config::load();
             let payload = ConfigPayload::from_driver_config(&cfg);

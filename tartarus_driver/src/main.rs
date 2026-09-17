@@ -31,6 +31,9 @@ pub(crate) use platform::send_key;
 pub const RELEASES_URL: &str = "https://github.com/ultramonaka/open-tartarus-driver/releases";
 // Where `configui`'s local web server listens (see configui.rs).
 pub const CONFIGUI_URL: &str = "http://127.0.0.1:7878/";
+// True when the configui server runs inside the driver process (`tray`
+// mode), so its /api/status can describe the driver itself.
+pub static CONFIGUI_EMBEDDED: AtomicBool = AtomicBool::new(false);
 
 // ===========================================================================
 // Locating config.toml / logs/run.log relative to where the binary is
@@ -634,6 +637,7 @@ fn main() {
 fn run_tray_mode() {
     platform::detach_console();
 
+    CONFIGUI_EMBEDDED.store(true, Ordering::SeqCst);
     std::thread::spawn(configui::run_configui_server);
     #[cfg(windows)]
     {

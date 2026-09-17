@@ -2,926 +2,1217 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Tartarus Pro Key Remap Settings</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tartarus Pro Settings</title>
 <style>
+  /* ------------------------------------------------------------------
+     Tokens. Light only, regardless of the OS appearance setting — the
+     design is a light page with a violet→magenta primary.
+     ------------------------------------------------------------------ */
   :root {
-    color-scheme: light dark;
+    color-scheme: light;
     --bg: #f5f5f7;
     --panel: #ffffff;
     --text: #1d1d1f;
     --muted: #6e6e73;
     --border: #d8d8dc;
-    --accent: #0071e3;
+    --border-strong: #c7c7cc;
+    --accent: #6d28d9;
     --accent-text: #ffffff;
-    --ok: #1e8e3e;
-    --err: #d93025;
+    --primary: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
+    --primary-shadow: 0 6px 16px rgba(124, 58, 237, 0.28);
+    --sel-bg: #ede7fb;
+    --sel-shadow: 0 0 0 2px rgba(124, 58, 237, 0.25), 0 6px 16px rgba(219, 39, 119, 0.3);
+    --hint-bg: #f3efff;
+    --hint-border: #ddd3fb;
+    --hint-icon: #6d28d9;
+    --ok: #16a34a; --ok-bg: #e9f9ee; --ok-border: #b7e4c6; --ok-text: #166534;
+    --warn: #f59e0b; --warn-bg: #fff7e6; --warn-border: #f7dfae; --warn-text: #8a5a00;
+    --err: #dc2626; --err-bg: #fdecec; --err-border: #f5c2c2; --err-text: #991b1b;
+    --key-bg: #f5f5f7;
+    --key-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+    --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --header-bg: rgba(255, 255, 255, 0.9);
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1c1c1e;
-      --panel: #2c2c2e;
-      --text: #f5f5f7;
-      --muted: #9a9aa0;
-      --border: #48484a;
-      --accent: #409cff;
-      --accent-text: #0b0b0c;
-    }
-  }
+
   * { box-sizing: border-box; }
+  html, body { margin: 0; }
   body {
-    margin: 0;
-    padding: 2rem 1.5rem 4rem;
     background: var(--bg);
     color: var(--text);
     font-family: -apple-system, "Segoe UI", "Yu Gothic UI", system-ui, sans-serif;
-    line-height: 1.5;
+    font-size: 14px;
+    line-height: 1.45;
+    padding-bottom: 48px;
   }
-  .titlebar { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-  .title-group { display: flex; align-items: baseline; gap: 0.5rem; }
-  h1 { font-size: 1.4rem; margin: 0 0 0.25rem; }
-  .version-tag { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
-  .sub { color: var(--muted); margin: 0 0 1.5rem; font-size: 0.9rem; }
-  #language-select {
-    padding: 0.3rem 0.5rem;
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    background: var(--panel);
-    color: var(--text);
-    font-size: 0.85rem;
+  a { color: var(--accent); }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.92em; }
+  [hidden] { display: none !important; }
+
+  /* ---------- header ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 16px;
+    padding: 14px clamp(16px, 3vw, 32px);
+    background: var(--header-bg); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border);
   }
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.25rem 1.5rem;
-    max-width: 900px;
-    margin: 0 auto 1.5rem;
+  .brand { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+  .brand h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+  .brand .version { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .topbar-right { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px 6px 8px; border-radius: 999px; font-size: 13px; font-weight: 600;
+    border: 1px solid var(--border); background: var(--panel); color: var(--muted);
   }
-  .panel h2 { font-size: 1.05rem; margin: 0 0 1rem; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 0.35rem 0.5rem; font-size: 0.92rem; }
-  th { color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); }
-  tr:not(:last-child) td { border-bottom: 1px solid var(--border); }
-  td:first-child { color: var(--muted); width: 4.5rem; font-variant-numeric: tabular-nums; }
-  select {
-    width: 100%;
-    padding: 0.3rem 0.4rem;
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    background: var(--bg);
-    color: var(--text);
-    font-size: 0.92rem;
+  .chip .dot { width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--border); color: #fff; flex: 0 0 auto; }
+  .chip.ok { background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok-text); }
+  .chip.ok .dot { background: var(--ok); }
+  .chip.warn { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn-text); }
+  .chip.warn .dot { background: var(--warn); color: #1d1d1f; }
+  .chip.err { background: var(--err-bg); border-color: var(--err-border); color: var(--err-text); }
+  .chip.err .dot { background: var(--err); }
+  .chip svg { width: 11px; height: 11px; }
+
+  .btn-primary {
+    padding: 8px 18px; border: none; border-radius: 8px;
+    background: var(--primary); color: var(--accent-text); font-weight: 600; font-size: 14px;
+    box-shadow: var(--primary-shadow);
   }
-  .key-picker {
-    display: flex;
-    gap: 0.3rem;
+  .btn-primary:disabled { opacity: 0.55; cursor: default; box-shadow: none; }
+  .btn-secondary {
+    padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 13px;
   }
-  .key-picker .key-cat {
-    flex: 0 0 auto;
-    width: auto;
-    min-width: 6.5rem;
+
+  /* segmented control */
+  .seg { display: inline-flex; padding: 3px; background: var(--bg); border: 1px solid var(--border); border-radius: 9px; font-size: 13px; gap: 2px; }
+  .seg button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: none; border-radius: 6px; background: transparent; color: var(--muted); font-weight: 600; }
+  .seg button.active { background: var(--primary); color: var(--accent-text); }
+  .seg button svg { width: 14px; height: 14px; }
+  .seg.plain button.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+  .seg button.unreachable { text-decoration: line-through; opacity: 0.6; }
+
+  /* toggle switch */
+  .switch { position: relative; width: 38px; height: 22px; border-radius: 11px; background: var(--border); border: none; padding: 0; flex: 0 0 auto; transition: background 0.15s; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.25); transition: left 0.15s; }
+  .switch.on { background: var(--accent); }
+  .switch.on::after { left: 18px; }
+  .switch-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+
+  /* ---------- layout + cards ---------- */
+  .layout { display: flex; flex-wrap: wrap; gap: 20px; padding: 20px clamp(16px, 3vw, 32px) 0; max-width: 1400px; margin: 0 auto; }
+  .col-main { flex: 1 1 620px; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+  .col-side { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; box-shadow: var(--card-shadow);
   }
-  .key-picker .key-val {
-    flex: 1 1 auto;
-    min-width: 0;
+  .card-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; }
+  .card-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
+  .card-head .tools { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+  .hint {
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-radius: 8px;
+    background: var(--hint-bg); border: 1px solid var(--hint-border); color: var(--text); font-size: 13px; line-height: 1.5;
   }
-  th.layer-col-unreachable,
-  td.layer-col-unreachable {
-    opacity: 0.4;
-    background-image: repeating-linear-gradient(
-      45deg,
-      var(--border) 0,
-      var(--border) 1px,
-      transparent 1px,
-      transparent 7px
-    );
+  .hint svg { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 2px; stroke: var(--hint-icon); }
+  .hint p { margin: 0; }
+
+  /* ---------- keypad ---------- */
+  .keypad-wrap { display: flex; flex-wrap: wrap; gap: 28px 36px; align-items: flex-start; padding: 8px 0 4px; }
+  .keypad { position: relative; width: 392px; height: 336px; flex: 0 0 auto; }
+  .key {
+    position: absolute; height: 56px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--key-bg); color: var(--text); box-shadow: var(--key-shadow);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    padding: 0; overflow: hidden;
   }
-  .grid4 {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 1rem;
+  .key .lbl { font-size: 15px; font-weight: 600; letter-spacing: 0.01em; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 4px; }
+  .key .lbl.small { font-size: 12px; }
+  .key .id { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .key.selected { background: var(--primary); border-color: transparent; color: var(--accent-text); box-shadow: var(--sel-shadow); }
+  .key.selected .id { color: rgba(255,255,255,0.75); }
+  .key:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .key .depth { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: var(--accent); opacity: 0.35; pointer-events: none; }
+  .key.overridden::before { content: ""; position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+  .thumb { display: flex; flex-direction: column; gap: 18px; flex: 1 1 220px; min-width: 0; }
+  .thumb-row { display: flex; align-items: center; gap: 14px; }
+  .wheel { width: 26px; height: 64px; border-radius: 13px; background: var(--bg); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; flex: 0 0 auto; }
+  .wheel i { width: 14px; height: 2px; background: var(--border); display: block; }
+  .thumb-list { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+  .thumb-list > div { display: flex; align-items: center; gap: 8px; }
+  .thumb-list span.l { color: var(--muted); width: 84px; }
+  .kbtn { padding: 2px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); font-weight: 600; font-size: 12px; color: var(--text); }
+  .kbtn:hover, .key:hover { border-color: var(--accent); }
+  .dpad { position: relative; width: 140px; height: 140px; flex: 0 0 auto; }
+  .dpad .ring { position: absolute; inset: 0; border-radius: 50%; background: var(--bg); border: 1px solid var(--border); }
+  .dpad .hub { position: absolute; left: 56px; top: 56px; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border); }
+  .dpad button { position: absolute; border-radius: 7px; background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; line-height: 1.1; }
+  .dpad button small { font-size: 10px; color: var(--muted); }
+  .dpad button span { font-weight: 700; font-size: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 3px; }
+  .dpad button:hover { border-color: var(--accent); }
+  .dpad .up { left: 48px; top: 6px; width: 44px; height: 40px; }
+  .dpad .down { left: 48px; top: 94px; width: 44px; height: 40px; }
+  .dpad .left { left: 6px; top: 50px; width: 40px; height: 40px; }
+  .dpad .right { left: 94px; top: 50px; width: 40px; height: 40px; }
+  .hyperbtn { width: 48px; height: 48px; border-radius: 50%; background: var(--bg); border: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--muted); flex: 0 0 auto; }
+  .hyperbtn:hover { border-color: var(--accent); color: var(--accent); }
+  .thumb-note { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .thumb-note strong { color: var(--text); }
+
+  /* ---------- list view ---------- */
+  .list-scroll { overflow-x: auto; }
+  .list-row, .list-head {
+    display: grid; grid-template-columns: 110px minmax(150px, 1fr) minmax(150px, 1fr) minmax(150px, 1fr);
+    gap: 8px; align-items: center; padding: 5px 4px; border-bottom: 1px solid var(--border); font-size: 13px;
   }
-  .field label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.3rem; }
-  input[type="number"] {
-    width: 100%;
-    padding: 0.3rem 0.4rem;
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    background: var(--bg);
-    color: var(--text);
-    font-size: 0.92rem;
+  .list-head { padding: 8px 4px; font-size: 12px; color: var(--muted); font-weight: 600; }
+  .list-row.thumb-row-bg { background: rgba(127, 127, 127, 0.05); }
+  .list-row .ctl { display: flex; align-items: center; gap: 8px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .list-row .ctl i { width: 8px; height: 8px; border-radius: 2px; background: var(--border); display: inline-block; flex: 0 0 auto; }
+  .list-row .ctl i.live { background: var(--accent); }
+  .cell {
+    display: flex; align-items: center; gap: 8px; padding: 5px 10px; min-width: 0; text-align: left;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text);
   }
-  .hint { color: var(--muted); font-size: 0.85rem; margin: 0.75rem 0 0; }
-  .calib-row { display: flex; align-items: center; gap: 0.75rem; margin: 1rem 0; }
-  .calib-row button { padding: 0.4rem 1rem; font-size: 0.85rem; }
-  td input[type="number"] { width: 4.5rem; }
-  td input[type="checkbox"] { width: 1.1rem; height: 1.1rem; }
-  .depth-bar-wrap {
-    position: relative;
-    display: inline-block;
-    vertical-align: middle;
-    width: 90px;
-    height: 0.85rem;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    overflow: hidden;
-    margin-right: 0.4rem;
+  .cell:hover { border-color: var(--accent); }
+  .cell.selected { background: var(--sel-bg); border-color: var(--accent); }
+  .cell .sym { width: 20px; height: 20px; border-radius: 4px; background: var(--panel); border: 1px solid var(--border); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; flex: 0 0 auto; }
+  .cell .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cell .code { color: var(--muted); font-size: 11px; font-family: ui-monospace, Menlo, monospace; }
+  .cell .caret { margin-left: auto; color: var(--muted); font-size: 11px; }
+  .cell.unreachable { opacity: 0.55; border-style: dashed; background-image: repeating-linear-gradient(45deg, var(--border) 0, var(--border) 1px, transparent 1px, transparent 7px); }
+  .list-note { grid-column: span 2; font-size: 12px; color: var(--muted); padding-left: 4px; }
+  .list-foot { display: flex; justify-content: flex-end; gap: 16px; font-size: 13px; }
+  .list-foot button { background: none; border: none; color: var(--accent); padding: 0; }
+
+  /* ---------- picker popover ---------- */
+  .picker {
+    position: absolute; z-index: 30; width: min(360px, calc(100vw - 32px));
+    background: var(--panel); border: 1px solid var(--border-strong); border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.22); padding: 12px; display: flex; flex-direction: column; gap: 10px;
   }
-  .depth-bar {
-    position: absolute;
-    left: 0; top: 0; bottom: 0;
-    width: 0%;
-    background: var(--accent);
+  .picker-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .picker-head b { font-size: 14px; }
+  .picker-close { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 12px; font-weight: 600; }
+  .picker-close:hover { border-color: var(--accent); color: var(--text); }
+  .picker-close kbd { font: inherit; font-size: 11px; padding: 0 5px; border-radius: 4px; border: 1px solid var(--border); background: var(--panel); }
+  .picker-close svg { width: 12px; height: 12px; }
+  .picker input[type="search"] {
+    width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; font-size: 14px;
   }
-  .actions {
-    max-width: 900px;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    position: sticky;
-    bottom: 0;
-    background: var(--bg);
-    padding: 1rem 0;
+  .picker .cats { display: flex; gap: 6px; flex-wrap: wrap; font-size: 13px; }
+  .picker .cats button { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-weight: 600; }
+  .picker .cats button.active { background: var(--primary); color: var(--accent-text); border-color: transparent; }
+  .picker .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; max-height: 300px; overflow-y: auto; }
+  .picker .grid.narrow { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .opt {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); text-align: left; min-width: 0;
   }
-  button {
-    appearance: none;
-    border: none;
-    border-radius: 8px;
-    background: var(--accent);
-    color: var(--accent-text);
-    font-size: 0.95rem;
-    font-weight: 600;
-    padding: 0.6rem 1.4rem;
-    cursor: pointer;
+  .opt:hover { border-color: var(--accent); }
+  .opt.current { background: var(--sel-bg); border-color: var(--accent); }
+  .opt .sym { width: 22px; height: 22px; border-radius: 5px; background: var(--bg); border: 1px solid var(--border); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; flex: 0 0 auto; }
+  .opt .txt { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+  .opt .txt b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .opt .txt small { font-size: 11px; color: var(--muted); font-family: ui-monospace, Menlo, monospace; }
+  .opt.compact { justify-content: center; padding: 8px 4px; font-weight: 600; font-size: 14px; }
+  .picker-foot { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); }
+  .picker-foot b { color: var(--text); }
+
+  /* ---------- forms ---------- */
+  .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  .field label { color: var(--muted); font-size: 12px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; }
+  .row label, .row .l { color: var(--muted); }
+  .row.disabled { opacity: 0.45; }
+  select, input[type="number"], input[type="color"] {
+    padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; font-size: 13px;
   }
-  button:disabled { opacity: 0.5; cursor: default; }
-  #status { font-size: 0.9rem; }
-  #status.ok { color: var(--ok); }
-  #status.err { color: var(--err); }
+  input[type="color"] { width: 40px; height: 30px; padding: 2px; }
+  input[type="range"] { flex: 1 1 auto; accent-color: var(--accent); }
+  .slider { display: flex; flex-direction: column; gap: 6px; flex: 1 1 240px; }
+  .slider .top { display: flex; justify-content: space-between; font-size: 12px; }
+  .slider .top span:first-child { color: var(--muted); }
+  .slider .top span:last-child { font-variant-numeric: tabular-nums; }
+  .sliders { display: flex; flex-wrap: wrap; gap: 16px 24px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+  .chips button { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--muted); }
+  .chips button.active { background: var(--primary); color: var(--accent-text); border-color: transparent; }
+  .swatches { display: flex; align-items: center; gap: 8px; }
+  .swatches button { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; padding: 0; }
+  .swatches button.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--panel) inset; }
+  details.perkey summary { cursor: pointer; font-size: 13px; color: var(--accent); list-style: none; }
+  details.perkey summary::-webkit-details-marker { display: none; }
+  .perkey-table { overflow-x: auto; margin-top: 8px; }
+  .perkey-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .perkey-table th, .perkey-table td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .perkey-table th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  .perkey-table td input[type="number"] { width: 4.5rem; }
+  .bar { display: inline-block; vertical-align: middle; width: 80px; height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; margin-right: 6px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); }
+
+  /* ---------- status components ---------- */
+  .status { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); }
+  .status .ico { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; color: #fff; }
+  .status .ico svg { width: 14px; height: 14px; }
+  .status .body { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; }
+  .status .title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 600; }
+  .status .badge { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; color: #fff; }
+  .status.ok { background: var(--ok-bg); border-color: var(--ok-border); }
+  .status.ok .ico, .status.ok .badge { background: var(--ok); }
+  .status.ok .title { color: var(--ok-text); }
+  .status.warn { background: var(--warn-bg); border-color: var(--warn-border); }
+  .status.warn .ico, .status.warn .badge { background: var(--warn); color: #1d1d1f; }
+  .status.warn .title { color: var(--warn-text); }
+  .status.info .ico { background: var(--muted); }
+  .status.info .badge { background: var(--muted); }
+  .status .body a { font-size: 13px; margin-top: 4px; }
+  .status .body .d { color: var(--text); }
 </style>
 </head>
 <body>
-  <div class="titlebar">
-    <div class="title-group">
-      <h1 data-i18n="pageTitle">Tartarus Pro Key Remap Settings</h1>
-      <span id="version-tag" class="version-tag"></span>
-    </div>
-    <select id="language-select">
-      <option value="en">English</option>
-      <option value="ja">日本語</option>
-    </select>
-  </div>
-  <p class="sub" data-i18n-html="subtitleHtml">
-    Saving overwrites <code>config.toml</code>. If <code>tartarus_driver</code> is already running, it
-    picks up the change automatically within about a second — no restart needed (this page itself never
-    reads keystrokes).
-  </p>
 
-  <div class="panel">
-    <h2 data-i18n="panelHypershift">Hyper Shift</h2>
-    <div class="grid4">
-      <div class="field">
-        <label data-i18n="labelHypershiftMode">Mode</label>
-        <select id="hypershift-mode">
-          <option value="layer_switch" data-i18n="optModeLayerSwitch">Layout Switch</option>
-          <option value="modifier_key" data-i18n="optModeModifierKey">Modifier Key</option>
+<header class="topbar">
+  <div class="brand">
+    <h1>Tartarus Pro</h1>
+    <span class="version" id="version-tag"></span>
+  </div>
+  <div class="topbar-right">
+    <div class="chip" id="save-chip"><span class="dot"></span><span id="save-chip-text"></span></div>
+    <div class="seg" id="lang-seg">
+      <button type="button" data-lang="en">EN</button>
+      <button type="button" data-lang="ja">日本語</button>
+    </div>
+    <button type="button" class="btn-primary" id="save-btn" data-i18n="btnSave">Save</button>
+  </div>
+</header>
+
+<main class="layout">
+  <div class="col-main">
+
+    <!-- ================= key assignments ================= -->
+    <section class="card" id="card-keys">
+      <div class="card-head">
+        <h2 data-i18n="cardKeys">Key assignments</h2>
+        <div class="tools">
+          <div class="seg" id="view-seg">
+            <button type="button" data-view="keypad">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M7 9h2M11 9h2M15 9h2M7 13h2M11 13h2M15 13h2M8 17h8"></path></svg><span data-i18n="viewKeypad">Keypad</span>
+            </button>
+            <button type="button" data-view="list">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg><span data-i18n="viewList">List</span>
+            </button>
+          </div>
+          <div class="switch-row">
+            <span data-i18n="liveDepth">Show live key depth</span>
+            <button type="button" class="switch" id="depth-switch" aria-pressed="false"></button>
+          </div>
+        </div>
+      </div>
+      <div class="hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg>
+        <p id="keys-hint"></p>
+      </div>
+
+      <!-- keypad view -->
+      <div id="keypad-view">
+        <div class="seg plain" id="layer-seg" style="align-self: flex-start; margin-bottom: 8px;">
+          <button type="button" data-layer="0"><span data-i18n="layerDefault">Default</span></button>
+          <button type="button" data-layer="1"><span data-i18n="layer1">Layer 1</span></button>
+          <button type="button" data-layer="2"><span data-i18n="layer2">Layer 2</span></button>
+        </div>
+        <div class="keypad-wrap">
+          <div class="keypad" id="keypad"></div>
+          <div class="thumb">
+            <div class="thumb-row">
+              <div class="wheel"><i></i><i></i><i></i><i></i></div>
+              <div class="thumb-list">
+                <div><span class="l" data-i18n="wheelUp">Wheel up</span><button type="button" class="kbtn" data-field="wheel_up"></button></div>
+                <div><span class="l" data-i18n="wheelDown">Wheel down</span><button type="button" class="kbtn" data-field="wheel_down"></button></div>
+                <div><span class="l" data-i18n="wheelClick">Wheel click</span><button type="button" class="kbtn" data-field="middle_click"></button></div>
+              </div>
+            </div>
+            <div class="thumb-row">
+              <button type="button" class="hyperbtn" id="hyper-btn" title="Hyper Shift">HS</button>
+              <div class="thumb-note"><span data-i18n="thumbButton">Thumb button (Hyper Shift)</span><br><strong id="hyper-summary"></strong></div>
+            </div>
+            <div class="thumb-row">
+              <div class="dpad">
+                <div class="ring"></div>
+                <button type="button" class="up" data-field="dpad_up"><small>↑</small><span></span></button>
+                <button type="button" class="down" data-field="dpad_down"><small>↓</small><span></span></button>
+                <button type="button" class="left" data-field="dpad_left"><small>←</small><span></span></button>
+                <button type="button" class="right" data-field="dpad_right"><small>→</small><span></span></button>
+                <div class="hub"></div>
+              </div>
+              <div class="thumb-list">
+                <div><span class="l" data-i18n="dpadUp">D-pad up</span><button type="button" class="kbtn" data-field="dpad_up"></button></div>
+                <div><span class="l" data-i18n="dpadDown">D-pad down</span><button type="button" class="kbtn" data-field="dpad_down"></button></div>
+                <div><span class="l" data-i18n="dpadLeft">D-pad left</span><button type="button" class="kbtn" data-field="dpad_left"></button></div>
+                <div><span class="l" data-i18n="dpadRight">D-pad right</span><button type="button" class="kbtn" data-field="dpad_right"></button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- list view -->
+      <div id="list-view" hidden>
+        <div class="list-scroll">
+          <div class="list-head">
+            <div data-i18n="colControl">Control</div>
+            <div data-i18n="colDefault">Default</div>
+            <div id="col-l1"></div>
+            <div id="col-l2"></div>
+          </div>
+          <div id="list-body"></div>
+        </div>
+        <div class="list-foot">
+          <button type="button" id="copy-l1" data-i18n="copyDefaultToL1">Copy Default → Layer 1</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= actuation ================= -->
+    <section class="card" id="card-actuation">
+      <div class="card-head">
+        <h2 data-i18n="cardActuation">Actuation</h2>
+        <div class="tools" style="font-size: 12px; color: var(--muted);"><span id="override-count"></span></div>
+      </div>
+      <div class="hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg>
+        <p data-i18n-html="hintActuation"></p>
+      </div>
+      <div class="sliders">
+        <div class="slider">
+          <div class="top"><span data-i18n="tOn">Press at (t_on)</span><span><b id="t-on-val"></b> / 255</span></div>
+          <input type="range" id="t-on" min="1" max="255">
+        </div>
+        <div class="slider">
+          <div class="top"><span data-i18n="tOff">Release at (t_off)</span><span><b id="t-off-val"></b> / 255</span></div>
+          <input type="range" id="t-off" min="0" max="254">
+        </div>
+      </div>
+      <details class="perkey" id="perkey-details">
+        <summary data-i18n="perKeyToggle">Per-key overrides &amp; live depth ▾</summary>
+        <div class="perkey-table">
+          <table>
+            <thead><tr>
+              <th data-i18n="thKey">Key</th><th data-i18n="thCurrent">Current</th><th data-i18n="thObservedMax">Observed max</th><th data-i18n="thOverride">Override</th><th>t_on</th><th>t_off</th>
+            </tr></thead>
+            <tbody id="perkey-body"></tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+  </div>
+
+  <div class="col-side">
+
+    <!-- ================= hyper shift ================= -->
+    <section class="card" id="card-hypershift">
+      <div class="card-head"><h2 data-i18n="cardHypershift">Hyper Shift</h2></div>
+      <div class="hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg>
+        <p data-i18n-html="hintHypershift"></p>
+      </div>
+      <div class="seg plain" id="hs-mode-seg" style="display: flex;">
+        <button type="button" data-mode="layer_switch" style="flex: 1; justify-content: center;"><span data-i18n="hsSwitchLayers">Switch layers</span></button>
+        <button type="button" data-mode="modifier_key" style="flex: 1; justify-content: center;"><span data-i18n="hsActAsKey">Act as a key</span></button>
+      </div>
+      <div class="row" id="hs-style-row">
+        <label for="hs-style" data-i18n="hsStyle">Style</label>
+        <select id="hs-style">
+          <option value="momentary" data-i18n="hsMomentary">Hold (momentary)</option>
+          <option value="toggle" data-i18n="hsToggle">Toggle (press to cycle)</option>
         </select>
       </div>
-      <div class="field" id="hypershift-switch-style-field">
-        <label data-i18n="labelHypershiftSwitchStyle">Switch Style</label>
-        <select id="hypershift-switch-style">
-          <option value="momentary" data-i18n="optStyleMomentary">Momentary (hold)</option>
-          <option value="toggle" data-i18n="optStyleToggle">Toggle (press to cycle)</option>
-        </select>
+      <div class="row" id="hs-count-row">
+        <label for="hs-count" data-i18n="hsLayers">Layers to cycle</label>
+        <select id="hs-count"><option value="2">2</option><option value="3">3</option></select>
       </div>
-      <div class="field" id="hypershift-layer-count-field">
-        <label data-i18n="labelHypershiftLayerCount">Layers</label>
-        <select id="hypershift-layer-count">
-          <option value="2">2</option>
-          <option value="3">3</option>
-        </select>
+      <div class="row" id="hs-key-row">
+        <span class="l" data-i18n="hsKey">Key to send</span>
+        <button type="button" class="cell" style="flex: 0 1 220px;" data-field="hypershift_modifier_key"></button>
       </div>
-      <div class="field" id="hypershift-modifier-key-field">
-        <label data-i18n="labelHypershiftModifierKey">Modifier Key</label>
-        <div id="slot-hypershift-modifier-key"></div>
+    </section>
+
+    <!-- ================= lighting ================= -->
+    <section class="card" id="card-lighting">
+      <div class="card-head"><h2 data-i18n="cardLighting">Lighting</h2></div>
+      <div class="hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg>
+        <p data-i18n-html="hintLighting"></p>
       </div>
-    </div>
-    <p class="hint" data-i18n-html="hintHypershiftHtml"></p>
+      <div class="chips" id="effect-chips">
+        <button type="button" data-effect="none" data-i18n="fxNone">Leave as is</button>
+        <button type="button" data-effect="off" data-i18n="fxOff">Off</button>
+        <button type="button" data-effect="static" data-i18n="fxStatic">Static</button>
+        <button type="button" data-effect="breathing" data-i18n="fxBreathing">Breathing</button>
+        <button type="button" data-effect="spectrum" data-i18n="fxSpectrum">Spectrum</button>
+        <button type="button" data-effect="wave" data-i18n="fxWave">Wave</button>
+        <button type="button" data-effect="reactive" data-i18n="fxReactive">Reactive</button>
+      </div>
+      <div class="row" id="color-row">
+        <label for="lighting-color" data-i18n="color">Color</label>
+        <span style="display: inline-flex; align-items: center; gap: 10px;"><input type="color" id="lighting-color"><code id="lighting-color-hex"></code></span>
+      </div>
+      <div class="row" id="brightness-row">
+        <label for="lighting-brightness" data-i18n="brightness">Brightness</label>
+        <span style="display: inline-flex; align-items: center; gap: 10px; flex: 1 1 auto; justify-content: flex-end;"><input type="range" id="lighting-brightness" min="0" max="255" style="max-width: 180px;"><b id="lighting-brightness-val" style="width: 28px; text-align: right; font-variant-numeric: tabular-nums;"></b></span>
+      </div>
+      <div class="row" id="direction-row">
+        <label for="lighting-direction" data-i18n="direction">Direction</label>
+        <select id="lighting-direction"><option value="left" data-i18n="dirLeft">Left</option><option value="right" data-i18n="dirRight">Right</option></select>
+      </div>
+      <div class="row" id="speed-row">
+        <label for="lighting-speed" data-i18n="speed">Speed (1–4)</label>
+        <input type="number" id="lighting-speed" min="1" max="4" style="width: 4.5rem;">
+      </div>
+    </section>
+
+    <!-- ================= layer indicator ================= -->
+    <section class="card" id="card-indicator">
+      <div class="card-head">
+        <h2 data-i18n="cardIndicator">Layer indicator LED</h2>
+        <button type="button" class="switch" id="indicator-switch" aria-pressed="false"></button>
+      </div>
+      <div class="hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg>
+        <p data-i18n-html="hintIndicator"></p>
+      </div>
+      <div class="row" id="indicator-color-row">
+        <span class="l" data-i18n="color">Color</span>
+        <div class="swatches" id="indicator-swatches">
+          <button type="button" data-color="red" style="background: #e0342c;" title="Red"></button>
+          <button type="button" data-color="green" style="background: #2fbf4f;" title="Green"></button>
+          <button type="button" data-color="blue" style="background: #2f7ee8;" title="Blue"></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= driver status ================= -->
+    <section class="card" id="card-status">
+      <div class="card-head"><h2 data-i18n="cardStatus">Driver status</h2></div>
+      <div id="status-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+    </section>
   </div>
+</main>
 
-  <div class="panel">
-    <h2 data-i18n="panelAnalog">Analog Keys (20 keys)</h2>
-    <table>
-      <thead>
-        <tr>
-          <th data-i18n="thKey">Key</th>
-          <th data-i18n="thDefaultLayer">Default Layer</th>
-          <th data-i18n="thLayer1" data-layer="1">Layer1</th>
-          <th data-i18n="thLayer2" data-layer="2">Layer2</th>
-        </tr>
-      </thead>
-      <tbody id="analog-body"></tbody>
-    </table>
-  </div>
-
-  <div class="panel">
-    <h2 data-i18n="panelSensitivity">Sensitivity (Actuation Point)</h2>
-    <div class="grid4">
-      <div class="field">
-        <label data-i18n="labelTOn">Default t_on (press threshold, deeper)</label>
-        <input type="number" id="t-on" min="1" max="255">
-      </div>
-      <div class="field">
-        <label data-i18n="labelTOff">Default t_off (release threshold, shallower)</label>
-        <input type="number" id="t-off" min="0" max="254">
-      </div>
-    </div>
-    <p class="hint" data-i18n-html="hintSensitivityHtml"></p>
-
-    <div class="calib-row">
-      <button id="calib-toggle-btn" type="button" data-i18n="btnCalibStart">Start Calibration</button>
-      <span id="calib-status" class="hint" style="margin:0;"></span>
-    </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th data-i18n="thKey">Key</th>
-          <th data-i18n="thCurrent">Current</th>
-          <th data-i18n="thObservedMax">Observed Max</th>
-          <th data-i18n="thOverride">Override</th>
-          <th data-i18n="thTOn">t_on</th>
-          <th data-i18n="thTOff">t_off</th>
-        </tr>
-      </thead>
-      <tbody id="perkey-body"></tbody>
-    </table>
-    <p class="hint" data-i18n-html="hintCalibrationHtml"></p>
-  </div>
-
-  <div class="panel">
-    <h2 data-i18n="panelDpad">D-pad</h2>
-    <div class="grid4">
-      <div class="field"><label data-i18n="labelLeft">Left</label><div id="slot-dpad-left"></div></div>
-      <div class="field"><label data-i18n="labelUp">Up</label><div id="slot-dpad-up"></div></div>
-      <div class="field"><label data-i18n="labelRight">Right</label><div id="slot-dpad-right"></div></div>
-      <div class="field"><label data-i18n="labelDown">Down</label><div id="slot-dpad-down"></div></div>
-    </div>
-  </div>
-
-  <div class="panel">
-    <h2 data-i18n="panelWheel">Wheel / Middle Click</h2>
-    <div class="grid4">
-      <div class="field"><label data-i18n="labelWheelUp">Wheel Up</label><div id="slot-wheel-up"></div></div>
-      <div class="field"><label data-i18n="labelWheelDown">Wheel Down</label><div id="slot-wheel-down"></div></div>
-      <div class="field"><label data-i18n="labelMiddleClick">Middle Click</label><div id="slot-middle-click"></div></div>
-    </div>
-  </div>
-
-  <div class="panel">
-    <h2 data-i18n="panelLighting">Lighting (LED)</h2>
-    <div class="grid4">
-      <div class="field">
-        <label data-i18n="labelEffect">Effect</label>
-        <select id="lighting-effect">
-          <option value="none" data-i18n="optEffectNone">Don't change</option>
-          <option value="off" data-i18n="optEffectOff">Off</option>
-          <option value="static" data-i18n="optEffectStatic">Static</option>
-          <option value="breathing" data-i18n="optEffectBreathing">Breathing</option>
-          <option value="spectrum" data-i18n="optEffectSpectrum">Spectrum</option>
-          <option value="wave" data-i18n="optEffectWave">Wave</option>
-          <option value="reactive" data-i18n="optEffectReactive">Reactive</option>
-        </select>
-      </div>
-      <div class="field" id="lighting-color-field">
-        <label data-i18n="labelColor">Color</label>
-        <input type="color" id="lighting-color">
-      </div>
-      <div class="field" id="lighting-brightness-field">
-        <label data-i18n="labelBrightness">Brightness (0-255)</label>
-        <input type="number" id="lighting-brightness" min="0" max="255">
-      </div>
-      <div class="field" id="lighting-direction-field">
-        <label data-i18n="labelDirection">Direction</label>
-        <select id="lighting-direction">
-          <option value="left" data-i18n="optDirLeft">Left</option>
-          <option value="right" data-i18n="optDirRight">Right</option>
-        </select>
-      </div>
-      <div class="field" id="lighting-speed-field">
-        <label data-i18n="labelSpeed">Speed (1-4)</label>
-        <input type="number" id="lighting-speed" min="1" max="4">
-      </div>
-    </div>
-    <p class="hint" data-i18n-html="hintLightingHtml"></p>
-  </div>
-
-  <div class="panel">
-    <h2 data-i18n="panelLayerIndicator">Layer Indicator</h2>
-    <div class="grid4">
-      <div class="field">
-        <label>
-          <input type="checkbox" id="layer-indicator-enabled" style="width:auto;margin-right:0.4rem;">
-          <span data-i18n="labelLayerIndicatorEnable">Enable</span>
-        </label>
-      </div>
-      <div class="field" id="layer-indicator-color-field">
-        <label data-i18n="labelColor">Color</label>
-        <select id="layer-indicator-color">
-          <option value="red" data-i18n="optColorRed">Red</option>
-          <option value="green" data-i18n="optColorGreen">Green</option>
-          <option value="blue" data-i18n="optColorBlue">Blue</option>
-        </select>
-      </div>
-    </div>
-    <p class="hint" data-i18n-html="hintLayerIndicatorHtml"></p>
-  </div>
-
-  <div class="actions">
-    <button id="save-btn" data-i18n="btnSave">Save</button>
-    <span id="status"></span>
-  </div>
+<div class="picker" id="picker" hidden></div>
 
 <script>
+'use strict';
+
+// ===========================================================================
+// i18n
+// ===========================================================================
 const I18N = {
   en: {
-    pageTitle: "Tartarus Pro Key Remap Settings",
-    subtitleHtml: 'Saving overwrites <code>config.toml</code>. If <code>tartarus_driver</code> is already running, it picks up the change automatically within about a second — no restart needed (this page itself never reads keystrokes).',
-    panelAnalog: "Analog Keys (20 keys)",
-    thKey: "Key",
-    thDefaultLayer: "Default Layer",
-    thLayer1: "Layer1",
-    thLayer2: "Layer2",
-    catBasic: "Basic",
-    catMedia: "Media Control",
-    panelHypershift: "Hyper Shift",
-    labelHypershiftMode: "Mode",
-    optModeLayerSwitch: "Layout Switch",
-    optModeModifierKey: "Modifier Key",
-    labelHypershiftSwitchStyle: "Switch Style",
-    optStyleMomentary: "Momentary (hold)",
-    optStyleToggle: "Toggle (press to cycle)",
-    labelHypershiftLayerCount: "Layers",
-    labelHypershiftModifierKey: "Modifier Key",
-    hintHypershiftHtml: 'Controls what the physical "Hyper Response" thumb button does. <b>Layout Switch</b> uses it to switch which of the Analog Keys table\'s columns below is active: <b>Momentary</b> (default) behaves as before — held selects Layer1, released returns to Default. <b>Toggle</b> instead advances one layer every press (Default → Layer1 → Layer2 → Default… for 3 layers, or Default ↔ Layer1 for 2), and ignores release. <b>Modifier Key</b> disables layer switching entirely and just sends the chosen key (default Alt) on press/release, like any other key. Layer columns that aren\'t currently reachable are shown hatched below. The "Layer Indicator" panel further down reflects the active layer only in Layout Switch mode.',
-    panelSensitivity: "Sensitivity (Actuation Point)",
-    labelTOn: "Default t_on (press threshold, deeper)",
-    labelTOff: "Default t_off (release threshold, shallower)",
-    hintSensitivityHtml: 'Key press depth is a raw value from 0 (not pressed) to 255 (fully pressed). A key registers as pressed once its depth exceeds t_on, and released once it drops below t_off (hysteresis). t_off must be smaller than t_on. Lower values make a key trigger with a lighter touch. Keys without an override use this default. Has no effect on response speed (only the threshold changes).',
-    btnCalibStart: "Start Calibration",
-    btnCalibStop: "Stop Calibration",
-    thCurrent: "Current",
-    thObservedMax: "Observed Max",
-    thOverride: "Override",
-    thTOn: "t_on",
-    thTOff: "t_off",
-    hintCalibrationHtml: 'Click "Start Calibration", then actually press keys — "Current" updates live, and "Observed Max" keeps the deepest value seen so far (recorded only while this page is open, never saved). Use these to decide each key\'s t_on/t_off. Only keys with "Override" checked use their own t_on/t_off instead of the default.',
-    panelDpad: "D-pad",
-    labelLeft: "Left",
-    labelUp: "Up",
-    labelRight: "Right",
-    labelDown: "Down",
-    panelWheel: "Wheel / Middle Click",
-    labelWheelUp: "Wheel Up",
-    labelWheelDown: "Wheel Down",
-    labelMiddleClick: "Middle Click",
-    panelLighting: "Lighting (LED)",
-    labelEffect: "Effect",
-    optEffectNone: "Don't change",
-    optEffectOff: "Off",
-    optEffectStatic: "Static",
-    optEffectBreathing: "Breathing",
-    optEffectSpectrum: "Spectrum",
-    optEffectWave: "Wave",
-    optEffectReactive: "Reactive",
-    labelColor: "Color",
-    labelBrightness: "Brightness (0-255)",
-    labelDirection: "Direction",
-    optDirLeft: "Left",
-    optDirRight: "Right",
-    labelSpeed: "Speed (1-4)",
-    hintLightingHtml: 'Choosing "Don\'t change" leaves <code>config.toml</code>\'s <code>[lighting]</code> at <code>effect = "none"</code> (i.e. the device\'s current lighting state is left alone). Any other choice sends that lighting command every time the driver starts. Not individually verified on real hardware for every effect (research-based, see <code>tasks/research/</code>). If it doesn\'t light up as expected, check <code>tasks/run.log</code>.',
-    panelLayerIndicator: "Layer Indicator",
-    labelLayerIndicatorEnable: "Enable",
-    optColorRed: "Red",
-    optColorGreen: "Green",
-    optColorBlue: "Blue",
-    hintLayerIndicatorHtml: 'When enabled, the side indicator LED lights up whenever a non-Default layer (Layer1/Layer2) is active — in the "Hyper Shift" panel above, this means Momentary while held, or Toggle whenever it has cycled away from Default — and turns off on Default. Not used at all in Modifier Key mode (the layer never changes). This is a separate LED (one of the 3 side LEDs) from the main key lighting panel above, so it doesn\'t interfere with effects like Spectrum. OpenRazer itself doesn\'t implement this for the Tartarus Pro either, so it\'s unverified on real hardware (research-based, see <code>tasks/research/2026-07-21_tartarus_pro_profile_indicator_led_protocol.md</code>). If it doesn\'t light up, check <code>tasks/run.log</code> for <code>WARNING: failed to send layer indicator ...</code>.',
     btnSave: "Save",
-    statusSaving: "Saving...",
-    statusSaved: "Saved. Applies automatically within ~1s if tartarus_driver is running.",
-    statusErrorPrefix: "Error: ",
-    statusNetworkErrorPrefix: "Network error: ",
-    calibPromptPressKeys: "Try pressing keys...",
-    calibTimeoutMsg: "(auto-stopped due to timeout)",
-    unknownKeySuffix: "(unknown key)",
+    chipClean: "All changes saved",
+    chipDirty: "Unsaved changes",
+    chipSaving: "Saving…",
+    chipSaved: "Saved · driver reloaded",
+    chipError: "Save failed",
+    cardKeys: "Key assignments",
+    viewKeypad: "Keypad",
+    viewList: "List",
+    liveDepth: "Show live key depth",
+    layerDefault: "Default",
+    layer1: "Layer 1",
+    layer2: "Layer 2",
+    keysHintKeypad: "Click any key, D-pad direction, wheel or the thumb button to change what it sends. Use the layer tabs to edit what the keys do while Hyper Shift is active.",
+    keysHintList: "Every control in one place. Click a cell to change what it sends. The thumb controls are the same on every layer.",
+    keysHintSudo: "D-pad and Hyper Shift need the driver started with sudo on macOS; everything else works without it.",
+    wheelUp: "Wheel up",
+    wheelDown: "Wheel down",
+    wheelClick: "Wheel click",
+    dpadUp: "D-pad up", dpadDown: "D-pad down", dpadLeft: "D-pad left", dpadRight: "D-pad right",
+    thumbButton: "Thumb button (Hyper Shift)",
+    hyperMomentary: "Hold → Layer 1",
+    hyperToggle: "Press → next layer",
+    hyperKey: "Sends",
+    colControl: "Control",
+    colDefault: "Default",
+    colLayer1: "Layer 1 · thumb held",
+    colLayer1Toggle: "Layer 1",
+    colLayer2: "Layer 2",
+    unreachable: "· unreachable",
+    copyDefaultToL1: "Copy Default → Layer 1",
+    copyConfirm: "Overwrite every Layer 1 assignment with the Default layer's?",
+    noteDpadSudo: "needs sudo on macOS",
+    noteWheel: "one tap per notch",
+    noteMiddle: "held while pressed",
+    noteHyper: "the thumb button; change under Hyper Shift",
+    cardActuation: "Actuation",
+    overrides: "Per-key overrides: ",
+    hintActuation: 'A key counts as pressed once it travels past <b>t_on</b> and released once it comes back above <b>t_off</b> (0–255). Keep t_off below t_on to avoid chatter. Turn on <b>Show live key depth</b> above to watch each key\'s travel on the keypad while you press it.',
+    tOn: "Press at (t_on)",
+    tOff: "Release at (t_off)",
+    perKeyToggle: "Per-key overrides & live depth ▾",
+    thKey: "Key",
+    thCurrent: "Current",
+    thObservedMax: "Observed max",
+    thOverride: "Override",
+    cardHypershift: "Hyper Shift",
+    hintHypershift: 'What the thumb button does. <b>Switch layers</b> uses Layer 1 (and Layer 2 with Toggle); <b>Act as a key</b> sends one key instead, e.g. Command. With "Hold", Layer 2 is unreachable and shown greyed out.',
+    hsSwitchLayers: "Switch layers",
+    hsActAsKey: "Act as a key",
+    hsStyle: "Style",
+    hsMomentary: "Hold (momentary)",
+    hsToggle: "Toggle (press to cycle)",
+    hsLayers: "Layers to cycle",
+    hsKey: "Key to send",
+    cardLighting: "Lighting",
+    hintLighting: 'Sent to the keypad when you save and again at every start. <b>Leave as is</b> keeps whatever the keypad already shows.',
+    fxNone: "Leave as is", fxOff: "Off", fxStatic: "Static", fxBreathing: "Breathing", fxSpectrum: "Spectrum", fxWave: "Wave", fxReactive: "Reactive",
+    color: "Color",
+    brightness: "Brightness",
+    direction: "Direction",
+    dirLeft: "Left", dirRight: "Right",
+    speed: "Speed (1–4)",
+    cardIndicator: "Layer indicator LED",
+    hintIndicator: "Lights one of the keypad's three side LEDs whenever a layer other than Default is active, so you can see which layer you're on.",
+    cardStatus: "Driver status",
+    stActive: "Active",
+    stRunning: "Running",
+    stActiveAll: "Analog keys, D-pad, wheel & Hyper Shift",
+    stActiveNoRoot: "Analog keys, wheel & wheel click",
+    stNotRoot: "Not running as root",
+    stLimited: "Limited",
+    stNotRootDetail: "D-pad remap & Hyper Shift are off. Start the driver with <code>sudo</code> to enable them.",
+    stHowSudo: "How to start with sudo",
+    stStandalone: "Settings page only",
+    stStandaloneBadge: "Not the driver",
+    stStandaloneDetail: "This page was started on its own, so it can't see the driver. Changes are still saved to config.toml and picked up by a running driver.",
+    stUnknown: "Status unavailable",
+    pickerTitle: "Key {n} · {layer}",
+    pickerField: { wheel_up: "Wheel up", wheel_down: "Wheel down", middle_click: "Wheel click", dpad_up: "D-pad ↑", dpad_down: "D-pad ↓", dpad_left: "D-pad ←", dpad_right: "D-pad →", hypershift_modifier_key: "Thumb button key" },
+    pickerClose: "Close",
+    pickerSearch: "Type to search keys…",
+    pickerCurrent: "Currently: ",
+    pickerNone: "No keys match",
+    catModifiers: "Modifiers", catLetters: "Letters", catNumbers: "Numbers", catFkeys: "F-keys", catNav: "Navigation", catPunct: "Punctuation", catMedia: "Media",
+    unknownKey: "(unknown key)",
+    mod: { LSHIFT: "Shift", RSHIFT: "Right Shift", LCTRL: "Control", RCTRL: "Right Control", LALT: "Option", RALT: "Right Option", LCMD: "Command", RCMD: "Right Command" },
+    modWin: { LSHIFT: "Shift", RSHIFT: "Right Shift", LCTRL: "Ctrl", RCTRL: "Right Ctrl", LALT: "Alt", RALT: "Right Alt", LCMD: "Win", RCMD: "Right Win" },
+    named: { SPACE: "Space", ENTER: "Enter", TAB: "Tab", ESCAPE: "Esc", BACKSPACE: "Backspace", DELETE: "Delete", INSERT: "Insert", HOME: "Home", END: "End", PAGEUP: "Page Up", PAGEDOWN: "Page Down", LEFT: "Left", UP: "Up", RIGHT: "Right", DOWN: "Down",
+             MEDIA_PLAY_PAUSE: "Play / Pause", MEDIA_STOP: "Stop", MEDIA_NEXT: "Next track", MEDIA_PREV: "Previous track", VOLUME_MUTE: "Mute", VOLUME_DOWN: "Volume down", VOLUME_UP: "Volume up" },
+    errPrefix: "Error: ",
+    netErrPrefix: "Network error: ",
   },
   ja: {
-    pageTitle: "Tartarus Pro キーリマップ設定",
-    subtitleHtml: '保存すると <code>config.toml</code> を上書きします。<code>tartarus_driver</code> が既に動いていれば、約1秒以内に自動的に反映されます(再起動不要。このページ自体はキー入力を監視しません)。',
-    panelAnalog: "アナログキー (20キー)",
+    btnSave: "保存",
+    chipClean: "すべて保存済み",
+    chipDirty: "未保存の変更",
+    chipSaving: "保存中…",
+    chipSaved: "保存しました · ドライバに反映",
+    chipError: "保存に失敗",
+    cardKeys: "キー割り当て",
+    viewKeypad: "キーパッド",
+    viewList: "一覧",
+    liveDepth: "押し込み深さを表示",
+    layerDefault: "通常",
+    layer1: "Layer 1",
+    layer2: "Layer 2",
+    keysHintKeypad: "キー・十字キー・ホイール・親指ボタンをクリックすると送信するキーを変更できます。レイヤータブで、ハイパーシフト中の割り当てを編集します。",
+    keysHintList: "すべての操作部を1つの一覧で。セルをクリックして送信するキーを変更します。親指側の操作はレイヤーに関係なく共通です。",
+    keysHintSudo: "macOSでは十字キーとハイパーシフトにsudoでの起動が必要です。それ以外はsudoなしで動作します。",
+    wheelUp: "ホイール上",
+    wheelDown: "ホイール下",
+    wheelClick: "ホイールクリック",
+    dpadUp: "十字キー 上", dpadDown: "十字キー 下", dpadLeft: "十字キー 左", dpadRight: "十字キー 右",
+    thumbButton: "親指ボタン(ハイパーシフト)",
+    hyperMomentary: "押している間 → Layer 1",
+    hyperToggle: "押すたび → 次のレイヤー",
+    hyperKey: "送信",
+    colControl: "操作部",
+    colDefault: "通常",
+    colLayer1: "Layer 1 · 親指ボタン押下中",
+    colLayer1Toggle: "Layer 1",
+    colLayer2: "Layer 2",
+    unreachable: "· 到達不可",
+    copyDefaultToL1: "通常 → Layer 1 にコピー",
+    copyConfirm: "Layer 1 のすべての割り当てを通常レイヤーの内容で上書きしますか?",
+    noteDpadSudo: "macOSではsudoが必要",
+    noteWheel: "1ノッチごとに1回タップ",
+    noteMiddle: "押している間ホールド",
+    noteHyper: "親指ボタン。設定は「ハイパーシフト」で",
+    cardActuation: "アクチュエーション",
+    overrides: "個別設定: ",
+    hintActuation: 'キーの押し込みが <b>t_on</b> を超えると押下、<b>t_off</b> を下回ると解放と判定します(0〜255)。チャタリングを防ぐため t_off は t_on より小さくしてください。上の<b>押し込み深さを表示</b>をオンにすると、キーを押したときの深さがキーパッド上に表示されます。',
+    tOn: "押下判定 (t_on)",
+    tOff: "解放判定 (t_off)",
+    perKeyToggle: "キー別の個別設定と押し込み深さ ▾",
     thKey: "キー",
-    thDefaultLayer: "通常レイヤー",
-    thLayer1: "Layer1",
-    thLayer2: "Layer2",
-    catBasic: "基本",
-    catMedia: "メディア操作",
-    panelHypershift: "ハイパーシフト",
-    labelHypershiftMode: "モード",
-    optModeLayerSwitch: "レイアウト切替",
-    optModeModifierKey: "修飾キー",
-    labelHypershiftSwitchStyle: "切替方式",
-    optStyleMomentary: "モーメンタリ(押している間)",
-    optStyleToggle: "トグル(押すたびに切替)",
-    labelHypershiftLayerCount: "レイヤー数",
-    labelHypershiftModifierKey: "修飾キー",
-    hintHypershiftHtml: '物理的な「Hyper Response」親指ボタンの動作を設定する。<b>レイアウト切替</b>を選ぶと、下の「アナログキー」表のどの列が有効になるかをこのボタンで切り替える: <b>モーメンタリ</b>(既定)は従来どおり — 押している間はLayer1、離すと通常レイヤーに戻る。<b>トグル</b>は押すたびに1レイヤーずつ進む(3レイヤーなら 通常→Layer1→Layer2→通常…、2レイヤーなら 通常⇔Layer1)。離す動作は無視される。<b>修飾キー</b>を選ぶとレイアウト切替は一切行わず、選択したキー(既定はAlt)を押下/解放時にそのまま送信する、通常のキーと同じ動作になる。現在の設定では到達できないレイヤー列は下でハッチング表示される。さらに下の「レイヤーインジケータ」パネルは、レイアウト切替モードの時のみ現在のレイヤーを反映する。',
-    panelSensitivity: "感度 (アクチュエーションポイント)",
-    labelTOn: "既定値 t_on (押下判定・深く)",
-    labelTOff: "既定値 t_off (解放判定・浅く)",
-    hintSensitivityHtml: 'キーの押し込み深さは0(未押下)〜255(最深)の生値。深さがt_onを超えたら押下、t_off未満に戻ったら解放と判定する(ヒステリシス)。t_offはt_onより小さい値にすること。値を小さくするほど軽く触れただけで反応するようになる。個別設定していないキーはこの既定値が使われる。反応速度への影響はない(判定しきい値が変わるだけ)。',
-    btnCalibStart: "キャリブレーション開始",
-    btnCalibStop: "キャリブレーション停止",
     thCurrent: "現在値",
     thObservedMax: "観測最大",
     thOverride: "個別設定",
-    thTOn: "t_on",
-    thTOff: "t_off",
-    hintCalibrationHtml: '「キャリブレーション開始」を押してから実際にキーを押し込むと、「現在値」がリアルタイムに動き、「観測最大」にはこれまでで一番深く押し込んだ値が残る(このページを開いている間のみ記録、保存はされない)。これを参考に各キーのt_on/t_offを決められる。「個別設定」にチェックを入れたキーだけ、既定値の代わりにそのキー専用のt_on/t_offが使われる。',
-    panelDpad: "十字キー (D-pad)",
-    labelLeft: "左",
-    labelUp: "上",
-    labelRight: "右",
-    labelDown: "下",
-    panelWheel: "ホイール / 中クリック",
-    labelWheelUp: "ホイール上",
-    labelWheelDown: "ホイール下",
-    labelMiddleClick: "中クリック",
-    panelLighting: "ライティング (LED)",
-    labelEffect: "エフェクト",
-    optEffectNone: "変更しない",
-    optEffectOff: "消灯",
-    optEffectStatic: "単色",
-    optEffectBreathing: "呼吸(単色)",
-    optEffectSpectrum: "スペクトラム",
-    optEffectWave: "ウェーブ",
-    optEffectReactive: "リアクティブ",
-    labelColor: "色",
-    labelBrightness: "明るさ (0-255)",
-    labelDirection: "方向",
-    optDirLeft: "左",
-    optDirRight: "右",
-    labelSpeed: "速度 (1-4)",
-    hintLightingHtml: '「変更しない」を選ぶと <code>config.toml</code> の <code>[lighting]</code> は <code>effect = "none"</code> のまま(=デバイス側の現在のライティング状態を変更しない)。それ以外を選ぶと、ドライバ起動時に毎回そのライティングコマンドを送信する。このプロトコルは実機で未検証(調査ベース、<code>tasks/research/</code>参照)。期待通りに光らない場合は <code>tasks/run.log</code> を確認。',
-    panelLayerIndicator: "レイヤーインジケータ",
-    labelLayerIndicatorEnable: "有効にする",
-    optColorRed: "赤",
-    optColorGreen: "緑",
-    optColorBlue: "青",
-    hintLayerIndicatorHtml: '有効にすると、側面のインジケータLEDが通常レイヤー以外(Layer1/Layer2)が有効な間点灯し、通常レイヤーに戻ると消灯する — 上の「ハイパーシフト」パネルでモーメンタリなら押している間、トグルなら通常レイヤーから切り替わっている間。修飾キーモードでは一切使われない(レイヤーが変化しないため)。上の「ライティング (LED)」パネルのメインキー照明とは別系統のLED(側面の3灯のうち1つ)なので、スペクトラム等のメイン照明を邪魔しない。このプロトコルはOpenRazer自体もTartarus Proでは未実装のため実機で未検証(調査ベース、<code>tasks/research/2026-07-21_tartarus_pro_profile_indicator_led_protocol.md</code>参照)。光らない場合は<code>tasks/run.log</code>の<code>WARNING: failed to send layer indicator ...</code>を確認。',
-    btnSave: "保存",
-    statusSaving: "保存中...",
-    statusSaved: "保存しました。tartarus_driverが動いていれば約1秒以内に自動反映されます。",
-    statusErrorPrefix: "エラー: ",
-    statusNetworkErrorPrefix: "通信エラー: ",
-    calibPromptPressKeys: "キーを押してみてください...",
-    calibTimeoutMsg: "(タイムアウトのため自動停止しました)",
-    unknownKeySuffix: "(未知のキー)",
+    cardHypershift: "ハイパーシフト",
+    hintHypershift: '親指ボタンの動作。<b>レイヤー切替</b>は Layer 1(トグルなら Layer 2 も)を使います。<b>キーとして動作</b>は代わりに1つのキー(例: Command)を送信します。「押している間」の場合 Layer 2 には到達できないためグレー表示になります。',
+    hsSwitchLayers: "レイヤー切替",
+    hsActAsKey: "キーとして動作",
+    hsStyle: "方式",
+    hsMomentary: "押している間(モーメンタリ)",
+    hsToggle: "トグル(押すたびに切替)",
+    hsLayers: "切り替えるレイヤー数",
+    hsKey: "送信するキー",
+    cardLighting: "ライティング",
+    hintLighting: '保存時と、ドライバ起動のたびにキーパッドへ送信されます。<b>変更しない</b>を選ぶと現在の状態のままになります。',
+    fxNone: "変更しない", fxOff: "消灯", fxStatic: "単色", fxBreathing: "呼吸", fxSpectrum: "スペクトラム", fxWave: "ウェーブ", fxReactive: "リアクティブ",
+    color: "色",
+    brightness: "明るさ",
+    direction: "方向",
+    dirLeft: "左", dirRight: "右",
+    speed: "速度 (1〜4)",
+    cardIndicator: "レイヤーインジケータLED",
+    hintIndicator: "通常以外のレイヤーが有効な間、側面の3つのLEDのうち1つを点灯させ、どのレイヤーにいるかを示します。",
+    cardStatus: "ドライバの状態",
+    stActive: "動作中",
+    stRunning: "稼働中",
+    stActiveAll: "アナログキー・十字キー・ホイール・ハイパーシフト",
+    stActiveNoRoot: "アナログキー・ホイール・ホイールクリック",
+    stNotRoot: "root権限なしで起動中",
+    stLimited: "一部制限",
+    stNotRootDetail: "十字キーのリマップとハイパーシフトは無効です。<code>sudo</code> でドライバを起動すると有効になります。",
+    stHowSudo: "sudoでの起動方法",
+    stStandalone: "設定ページのみ",
+    stStandaloneBadge: "ドライバではない",
+    stStandaloneDetail: "このページは単独で起動されているため、ドライバの状態は分かりません。変更は config.toml に保存され、動作中のドライバに反映されます。",
+    stUnknown: "状態を取得できません",
+    pickerTitle: "キー {n} · {layer}",
+    pickerField: { wheel_up: "ホイール上", wheel_down: "ホイール下", middle_click: "ホイールクリック", dpad_up: "十字キー ↑", dpad_down: "十字キー ↓", dpad_left: "十字キー ←", dpad_right: "十字キー →", hypershift_modifier_key: "親指ボタンのキー" },
+    pickerClose: "閉じる",
+    pickerSearch: "キー名で検索…",
+    pickerCurrent: "現在: ",
+    pickerNone: "該当するキーがありません",
+    catModifiers: "修飾キー", catLetters: "英字", catNumbers: "数字", catFkeys: "ファンクション", catNav: "ナビゲーション", catPunct: "記号", catMedia: "メディア",
+    unknownKey: "(未知のキー)",
+    mod: { LSHIFT: "Shift", RSHIFT: "右 Shift", LCTRL: "Control", RCTRL: "右 Control", LALT: "Option", RALT: "右 Option", LCMD: "Command", RCMD: "右 Command" },
+    modWin: { LSHIFT: "Shift", RSHIFT: "右 Shift", LCTRL: "Ctrl", RCTRL: "右 Ctrl", LALT: "Alt", RALT: "右 Alt", LCMD: "Win", RCMD: "右 Win" },
+    named: { SPACE: "Space", ENTER: "Enter", TAB: "Tab", ESCAPE: "Esc", BACKSPACE: "Backspace", DELETE: "Delete", INSERT: "Insert", HOME: "Home", END: "End", PAGEUP: "Page Up", PAGEDOWN: "Page Down", LEFT: "←", UP: "↑", RIGHT: "→", DOWN: "↓",
+             MEDIA_PLAY_PAUSE: "再生 / 一時停止", MEDIA_STOP: "停止", MEDIA_NEXT: "次の曲", MEDIA_PREV: "前の曲", VOLUME_MUTE: "ミュート", VOLUME_DOWN: "音量を下げる", VOLUME_UP: "音量を上げる" },
+    errPrefix: "エラー: ",
+    netErrPrefix: "通信エラー: ",
   },
 };
+const t = (k) => I18N[ui.lang][k] ?? I18N.en[k] ?? k;
 
-let currentLang = 'en';
-let KEY_CATEGORIES = { basic: [], media: [] };
+// ===========================================================================
+// State
+// ===========================================================================
+const ui = { lang: 'en', view: 'keypad', layer: 0, platform: 'macos', status: null, calib: null, depths: new Array(20).fill(0), observedMax: new Array(20).fill(0), saveState: 'clean' };
+let KEYS = { basic: [], media: [] };
+let state = null;     // the editable config payload (same shape as /api/config)
+let savedJson = '';   // JSON of the last loaded/saved payload, for dirty detection
 
-function applyLanguage(lang) {
-  if (!I18N[lang]) lang = 'en';
-  currentLang = lang;
-  document.documentElement.lang = lang;
-  document.title = I18N[lang].pageTitle;
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    el.textContent = I18N[lang][el.dataset.i18n];
-  });
-  document.querySelectorAll('[data-i18n-html]').forEach(el => {
-    el.innerHTML = I18N[lang][el.dataset.i18nHtml];
-  });
-  document.getElementById('language-select').value = lang;
-  updateCalibButtonText();
+const LAYER_FIELDS = ['keys_default', 'keys_layer1', 'keys_layer2'];
+const THUMB_FIELDS = ['dpad_up', 'dpad_down', 'dpad_left', 'dpad_right', 'wheel_up', 'wheel_down', 'middle_click'];
+const MODIFIERS = ['LSHIFT', 'RSHIFT', 'LCTRL', 'RCTRL', 'LALT', 'RALT', 'LCMD', 'RCMD'];
+const PUNCT = { LBRACKET: '[', RBRACKET: ']', SEMICOLON: ';', QUOTE: "'", COMMA: ',', PERIOD: '.', SLASH: '/', BACKSLASH: '\\', MINUS: '-', EQUALS: '=', GRAVE: '`' };
+const MAC_SYM = { LSHIFT: '⇧', RSHIFT: '⇧', LCTRL: '⌃', RCTRL: '⌃', LALT: '⌥', RALT: '⌥', LCMD: '⌘', RCMD: '⌘', TAB: '⇥', ENTER: '↩', BACKSPACE: '⌫', DELETE: '⌦', ESCAPE: '⎋', LEFT: '←', UP: '↑', RIGHT: '→', DOWN: '↓' };
+
+function isMac() { return ui.platform === 'macos'; }
+
+// Human-readable presentation of a key name: {sym, name, code}. `code` is
+// shown (small, monospace) only when it adds information over `name`.
+function keyInfo(name) {
+  if (name == null || name === '') return { sym: '', name: '—', code: '' };
+  if (MODIFIERS.includes(name)) {
+    const label = (isMac() ? t('mod') : t('modWin'))[name] || name;
+    return { sym: isMac() ? MAC_SYM[name] : '', name: label, code: name };
+  }
+  if (PUNCT[name]) return { sym: '', name: PUNCT[name], code: name };
+  const named = t('named')[name];
+  if (named) return { sym: isMac() ? (MAC_SYM[name] || '') : '', name: named, code: /^(LEFT|UP|RIGHT|DOWN|SPACE|ENTER|TAB|ESCAPE)$/.test(name) ? '' : name };
+  if (/^[A-Z0-9]$/.test(name) || /^F\d+$/.test(name)) return { sym: '', name, code: '' };
+  const known = KEYS.basic.includes(name) || KEYS.media.includes(name);
+  return { sym: '', name, code: known ? '' : t('unknownKey') };
 }
 
-async function setLanguage(lang) {
-  applyLanguage(lang);
+function categoryOf(name) {
+  if (MODIFIERS.includes(name)) return 'modifiers';
+  if (/^[A-Z]$/.test(name)) return 'letters';
+  if (/^[0-9]$/.test(name)) return 'numbers';
+  if (/^F\d+$/.test(name)) return 'fkeys';
+  if (PUNCT[name]) return 'punct';
+  if (KEYS.media.includes(name)) return 'media';
+  return 'nav';
+}
+const CATEGORIES = ['modifiers', 'letters', 'numbers', 'fkeys', 'nav', 'punct', 'media'];
+const CAT_LABEL = { modifiers: 'catModifiers', letters: 'catLetters', numbers: 'catNumbers', fkeys: 'catFkeys', nav: 'catNav', punct: 'catPunct', media: 'catMedia' };
+
+function reachableLayers() {
+  if (state.hypershift_mode === 'modifier_key') return 1;
+  if (state.hypershift_switch_style === 'toggle') return Number(state.hypershift_layer_count);
+  return 2;
+}
+function isDirty() { return JSON.stringify(state) !== savedJson; }
+function overrideCount() { return state.per_key_t_on.filter((v, i) => v != null && state.per_key_t_off[i] != null).length; }
+
+// ===========================================================================
+// Rendering
+// ===========================================================================
+function $(id) { return document.getElementById(id); }
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+function applyLanguage() {
+  document.documentElement.lang = ui.lang;
+  document.querySelectorAll('[data-i18n]').forEach(e => { e.textContent = t(e.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-html]').forEach(e => { e.innerHTML = t(e.dataset.i18nHtml); });
+  document.querySelectorAll('#lang-seg button').forEach(b => b.classList.toggle('active', b.dataset.lang === ui.lang));
+}
+
+function renderAll() {
+  applyLanguage();
+  renderChip();
+  renderKeysCard();
+  renderActuation();
+  renderHypershift();
+  renderLighting();
+  renderIndicator();
+  renderStatus();
+}
+
+function renderChip() {
+  const chip = $('save-chip'), text = $('save-chip-text');
+  const dot = chip.querySelector('.dot');
+  const dirty = isDirty();
+  let cls = '', label = t('chipClean'), icon = 'M5 12.5l4.5 4.5L19 7.5';
+  if (ui.saveState === 'saving') { label = t('chipSaving'); icon = 'M12 6v6l4 2'; }
+  else if (ui.saveState === 'error') { cls = 'err'; label = t('chipError') + (ui.saveError ? ' · ' + ui.saveError : ''); icon = 'M6 6l12 12M18 6L6 18'; }
+  else if (dirty) { cls = 'warn'; label = t('chipDirty'); icon = 'M12 6v7M12 17h.01'; }
+  else if (ui.saveState === 'saved') { cls = 'ok'; label = t('chipSaved'); }
+  else { cls = 'ok'; }
+  chip.className = 'chip ' + cls;
+  text.textContent = label;
+  dot.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="' + icon + '"></path></svg>';
+  $('save-btn').disabled = ui.saveState === 'saving';
+}
+
+function renderKeysCard() {
+  $('keys-hint').textContent = (ui.view === 'keypad' ? t('keysHintKeypad') : t('keysHintList')) + (isMac() ? ' ' + t('keysHintSudo') : '');
+  document.querySelectorAll('#view-seg button').forEach(b => b.classList.toggle('active', b.dataset.view === ui.view));
+  $('keypad-view').hidden = ui.view !== 'keypad';
+  $('list-view').hidden = ui.view !== 'list';
+  $('depth-switch').classList.toggle('on', !!ui.calib);
+  $('depth-switch').setAttribute('aria-pressed', String(!!ui.calib));
+  if (ui.view === 'keypad') renderKeypad(); else renderList();
+}
+
+// Physical layout: four staggered rows of 5/5/5/4 keys plus the wide key 20.
+const KEY_GEOM = (() => {
+  const rows = [[0, 0, 5], [14, 64, 5], [28, 128, 5], [42, 192, 4]];
+  const g = [];
+  for (const [ox, y, n] of rows) for (let i = 0; i < n; i++) g.push({ x: ox + i * 64, y, w: 56 });
+  g.push({ x: 56, y: 264, w: 248 });
+  return g;
+})();
+
+function labelFor(name) {
+  const k = keyInfo(name);
+  return (k.sym ? k.sym + ' ' : '') + k.name;
+}
+
+function renderKeypad() {
+  const reach = reachableLayers();
+  if (ui.layer >= reach) ui.layer = 0;
+  document.querySelectorAll('#layer-seg button').forEach(b => {
+    const l = Number(b.dataset.layer);
+    b.classList.toggle('active', l === ui.layer);
+    b.classList.toggle('unreachable', l >= reach);
+  });
+  const field = LAYER_FIELDS[ui.layer];
+  const pad = $('keypad');
+  pad.replaceChildren();
+  for (let i = 0; i < 20; i++) {
+    const g = KEY_GEOM[i];
+    const b = el('button', 'key');
+    b.type = 'button';
+    b.style.left = g.x + 'px'; b.style.top = g.y + 'px'; b.style.width = g.w + 'px';
+    b.dataset.index = i;
+    const label = labelFor(state[field][i]);
+    const lbl = el('div', 'lbl' + (label.length > 4 ? ' small' : ''), label);
+    b.append(lbl, el('div', 'id', String(i + 1).padStart(2, '0')));
+    const depth = el('div', 'depth'); depth.id = 'kdepth-' + i; b.appendChild(depth);
+    if (state.per_key_t_on[i] != null && state.per_key_t_off[i] != null) b.classList.add('overridden');
+    if (ui.picker && ui.picker.kind === 'analog' && ui.picker.index === i) b.classList.add('selected');
+    b.addEventListener('click', (ev) => openPicker({ kind: 'analog', index: i, layer: ui.layer }, ev.currentTarget));
+    pad.appendChild(b);
+  }
+  document.querySelectorAll('.thumb [data-field]').forEach(b => {
+    const f = b.dataset.field;
+    const span = b.querySelector('span');
+    if (span) span.textContent = labelFor(state[f]); else b.textContent = labelFor(state[f]);
+    b.onclick = (ev) => openPicker({ kind: 'field', field: f }, ev.currentTarget);
+  });
+  $('hyper-summary').textContent = hyperSummary();
+  $('hyper-btn').onclick = () => { $('card-hypershift').scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+  updateDepthBars();
+}
+
+function hyperSummary() {
+  if (state.hypershift_mode === 'modifier_key') return t('hyperKey') + ' ' + labelFor(state.hypershift_modifier_key);
+  return state.hypershift_switch_style === 'toggle' ? t('hyperToggle') + ' (' + state.hypershift_layer_count + ')' : t('hyperMomentary');
+}
+
+function cellButton(name, opts) {
+  const b = el('button', 'cell' + (opts.unreachable ? ' unreachable' : '') + (opts.selected ? ' selected' : ''));
+  b.type = 'button';
+  const k = keyInfo(name);
+  if (k.sym) b.appendChild(el('span', 'sym', k.sym));
+  b.appendChild(el('span', 'name', k.name));
+  if (k.code) b.appendChild(el('span', 'code', k.code));
+  b.appendChild(el('span', 'caret', '▾'));
+  b.addEventListener('click', (ev) => openPicker(opts.target, ev.currentTarget));
+  return b;
+}
+
+function renderList() {
+  const reach = reachableLayers();
+  $('col-l1').textContent = (state.hypershift_switch_style === 'toggle' ? t('colLayer1Toggle') : t('colLayer1')) + (reach < 2 ? ' ' + t('unreachable') : '');
+  $('col-l2').textContent = t('colLayer2') + (reach < 3 ? ' ' + t('unreachable') : '');
+  $('col-l1').style.opacity = reach < 2 ? 0.45 : 1;
+  $('col-l2').style.opacity = reach < 3 ? 0.45 : 1;
+  const body = $('list-body');
+  body.replaceChildren();
+  for (let i = 0; i < 20; i++) {
+    const row = el('div', 'list-row');
+    const ctl = el('div', 'ctl');
+    const dot = el('i'); dot.id = 'ldot-' + i; ctl.appendChild(dot);
+    ctl.appendChild(document.createTextNode(t('thKey') + ' ' + String(i + 1).padStart(2, '0')));
+    row.appendChild(ctl);
+    for (let l = 0; l < 3; l++) {
+      const sel = ui.picker && ui.picker.kind === 'analog' && ui.picker.index === i && ui.picker.layer === l;
+      row.appendChild(cellButton(state[LAYER_FIELDS[l]][i], { unreachable: l >= reach, selected: sel, target: { kind: 'analog', index: i, layer: l } }));
+    }
+    body.appendChild(row);
+  }
+  const notes = { dpad_up: '', dpad_down: '', dpad_left: '', dpad_right: isMac() ? t('noteDpadSudo') : '', wheel_up: t('noteWheel'), wheel_down: t('noteWheel'), middle_click: t('noteMiddle') };
+  for (const f of THUMB_FIELDS) {
+    const row = el('div', 'list-row thumb-row-bg');
+    const ctl = el('div', 'ctl'); ctl.appendChild(el('i')); ctl.appendChild(document.createTextNode(t('pickerField')[f]));
+    row.appendChild(ctl);
+    row.appendChild(cellButton(state[f], { target: { kind: 'field', field: f }, selected: ui.picker && ui.picker.kind === 'field' && ui.picker.field === f }));
+    row.appendChild(el('div', 'list-note', notes[f]));
+    body.appendChild(row);
+  }
+  const hrow = el('div', 'list-row thumb-row-bg');
+  const hctl = el('div', 'ctl'); hctl.appendChild(el('i')); hctl.appendChild(document.createTextNode('Hyper'));
+  hrow.appendChild(hctl);
+  const hcell = el('button', 'cell'); hcell.type = 'button';
+  hcell.appendChild(el('span', 'name', hyperSummary())); hcell.appendChild(el('span', 'caret', '▾'));
+  hcell.addEventListener('click', () => $('card-hypershift').scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  hrow.appendChild(hcell);
+  hrow.appendChild(el('div', 'list-note', t('noteHyper')));
+  body.appendChild(hrow);
+  updateDepthBars();
+}
+
+function renderActuation() {
+  $('t-on').value = state.t_on; $('t-on-val').textContent = state.t_on;
+  $('t-off').value = state.t_off; $('t-off-val').textContent = state.t_off;
+  $('override-count').textContent = t('overrides') + overrideCount();
+  const body = $('perkey-body');
+  body.replaceChildren();
+  for (let i = 0; i < 20; i++) {
+    const has = state.per_key_t_on[i] != null && state.per_key_t_off[i] != null;
+    const tr = el('tr');
+    tr.appendChild(el('td', null, t('thKey') + ' ' + String(i + 1).padStart(2, '0')));
+    const tdCur = el('td'); const bar = el('span', 'bar'); const fill = el('i'); fill.id = 'pbar-' + i; bar.appendChild(fill);
+    const num = el('span', null, String(ui.depths[i])); num.id = 'pnum-' + i; tdCur.append(bar, num); tr.appendChild(tdCur);
+    const tdMax = el('td', null, String(ui.observedMax[i])); tdMax.id = 'pmax-' + i; tr.appendChild(tdMax);
+    const tdEn = el('td'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = has; tdEn.appendChild(cb); tr.appendChild(tdEn);
+    const tdOn = el('td'); const on = el('input'); on.type = 'number'; on.min = 1; on.max = 255; on.value = has ? state.per_key_t_on[i] : state.t_on; on.disabled = !has; tdOn.appendChild(on); tr.appendChild(tdOn);
+    const tdOff = el('td'); const off = el('input'); off.type = 'number'; off.min = 0; off.max = 254; off.value = has ? state.per_key_t_off[i] : state.t_off; off.disabled = !has; tdOff.appendChild(off); tr.appendChild(tdOff);
+    const commit = () => {
+      if (cb.checked) { state.per_key_t_on[i] = Number(on.value); state.per_key_t_off[i] = Number(off.value); }
+      else { state.per_key_t_on[i] = null; state.per_key_t_off[i] = null; }
+      on.disabled = off.disabled = !cb.checked;
+      $('override-count').textContent = t('overrides') + overrideCount();
+      renderChip();
+      if (ui.view === 'keypad') renderKeypad();
+    };
+    cb.addEventListener('change', commit); on.addEventListener('change', commit); off.addEventListener('change', commit);
+    body.appendChild(tr);
+  }
+}
+
+function renderHypershift() {
+  document.querySelectorAll('#hs-mode-seg button').forEach(b => b.classList.toggle('active', b.dataset.mode === state.hypershift_mode));
+  const layerMode = state.hypershift_mode === 'layer_switch';
+  $('hs-style').value = state.hypershift_switch_style;
+  $('hs-count').value = String(state.hypershift_layer_count);
+  $('hs-style-row').hidden = !layerMode;
+  $('hs-count-row').hidden = !layerMode;
+  $('hs-count-row').classList.toggle('disabled', state.hypershift_switch_style !== 'toggle');
+  $('hs-count').disabled = state.hypershift_switch_style !== 'toggle';
+  $('hs-key-row').hidden = layerMode;
+  const slot = $('hs-key-row').querySelector('[data-field]');
+  const fresh = cellButton(state.hypershift_modifier_key, { target: { kind: 'field', field: 'hypershift_modifier_key' } });
+  fresh.dataset.field = 'hypershift_modifier_key'; fresh.style.flex = '0 1 220px';
+  slot.replaceWith(fresh);
+}
+
+function renderLighting() {
+  const fx = state.lighting_effect;
+  document.querySelectorAll('#effect-chips button').forEach(b => b.classList.toggle('active', b.dataset.effect === fx));
+  $('lighting-color').value = '#' + state.lighting_color.toLowerCase();
+  $('lighting-color-hex').textContent = '#' + state.lighting_color.toUpperCase();
+  $('lighting-brightness').value = state.lighting_brightness; $('lighting-brightness-val').textContent = state.lighting_brightness;
+  $('lighting-direction').value = state.lighting_wave_direction;
+  $('lighting-speed').value = state.lighting_reactive_speed;
+  $('color-row').hidden = !['static', 'breathing', 'reactive'].includes(fx);
+  $('brightness-row').hidden = fx === 'none';
+  $('direction-row').hidden = fx !== 'wave';
+  $('speed-row').hidden = fx !== 'reactive';
+}
+
+function renderIndicator() {
+  const sw = $('indicator-switch');
+  sw.classList.toggle('on', !!state.layer_indicator_enabled);
+  sw.setAttribute('aria-pressed', String(!!state.layer_indicator_enabled));
+  $('indicator-color-row').classList.toggle('disabled', !state.layer_indicator_enabled);
+  document.querySelectorAll('#indicator-swatches button').forEach(b => b.classList.toggle('active', b.dataset.color === state.layer_indicator_color));
+}
+
+function statusBlock(kind, title, badge, detailHtml, link) {
+  const s = el('div', 'status ' + kind);
+  const ico = el('span', 'ico');
+  ico.innerHTML = kind === 'ok'
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v6M12 17h.01"></path></svg>';
+  const body = el('div', 'body');
+  const tt = el('div', 'title'); tt.appendChild(el('span', null, title)); if (badge) tt.appendChild(el('span', 'badge', badge));
+  const d = el('div', 'd'); d.innerHTML = detailHtml;
+  body.append(tt, d);
+  if (link) { const a = el('a', null, link.text); a.href = link.href; a.target = '_blank'; a.rel = 'noopener'; body.appendChild(a); }
+  s.append(ico, body);
+  return s;
+}
+
+function renderStatus() {
+  const list = $('status-list');
+  list.replaceChildren();
+  const st = ui.status;
+  if (!st) { list.appendChild(statusBlock('info', t('stUnknown'), '', '')); return; }
+  if (!st.embedded) {
+    list.appendChild(statusBlock('info', t('stStandalone'), t('stStandaloneBadge'), t('stStandaloneDetail')));
+    return;
+  }
+  const mac = st.platform === 'macos';
+  if (mac && !st.root) {
+    list.appendChild(statusBlock('ok', t('stActive'), t('stRunning'), t('stActiveNoRoot')));
+    list.appendChild(statusBlock('warn', t('stNotRoot'), t('stLimited'), t('stNotRootDetail'), { text: t('stHowSudo'), href: 'https://github.com/LukeGarnsey/open-tartarus-driver-mac/blob/main/USAGE.md#9-macos' }));
+  } else {
+    list.appendChild(statusBlock('ok', t('stActive'), t('stRunning'), t('stActiveAll')));
+  }
+}
+
+// ===========================================================================
+// Key picker popover
+// ===========================================================================
+function openPicker(target, anchor) {
+  ui.picker = target;
+  ui.pickerCat = null;
+  ui.pickerQuery = '';
+  const current = target.kind === 'analog' ? state[LAYER_FIELDS[target.layer]][target.index] : state[target.field];
+  ui.pickerCat = categoryOf(current);
+  renderPicker(anchor);
+  renderKeysCard();
+  renderHypershift();
+}
+function closePicker() {
+  if (!ui.picker) return;
+  ui.picker = null;
+  $('picker').hidden = true;
+  renderKeysCard();
+  renderHypershift();
+}
+function assign(name) {
+  const tg = ui.picker;
+  if (!tg) return;
+  if (tg.kind === 'analog') state[LAYER_FIELDS[tg.layer]][tg.index] = name;
+  else state[tg.field] = name;
+  closePicker();
+  renderChip();
+}
+function renderPicker(anchor) {
+  const tg = ui.picker;
+  const p = $('picker');
+  p.replaceChildren();
+  const current = tg.kind === 'analog' ? state[LAYER_FIELDS[tg.layer]][tg.index] : state[tg.field];
+  const head = el('div', 'picker-head');
+  const title = tg.kind === 'analog'
+    ? t('pickerTitle').replace('{n}', String(tg.index + 1).padStart(2, '0')).replace('{layer}', [t('layerDefault'), t('layer1'), t('layer2')][tg.layer])
+    : t('pickerField')[tg.field];
+  const close = el('button', 'picker-close'); close.type = 'button'; close.title = t('pickerClose');
+  const kbd = el('kbd', null, 'esc');
+  close.appendChild(kbd);
+  close.insertAdjacentHTML('beforeend', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>');
+  close.addEventListener('click', closePicker);
+  head.append(el('b', null, title), close);
+  const search = el('input'); search.type = 'search'; search.placeholder = t('pickerSearch'); search.value = ui.pickerQuery;
+  const cats = el('div', 'cats');
+  for (const c of CATEGORIES) {
+    const b = el('button', ui.pickerCat === c && !ui.pickerQuery ? 'active' : '', t(CAT_LABEL[c]));
+    b.type = 'button';
+    b.addEventListener('click', () => { ui.pickerCat = c; ui.pickerQuery = ''; renderPicker(anchor); });
+    cats.appendChild(b);
+  }
+  const all = [...KEYS.basic, ...KEYS.media];
+  const q = ui.pickerQuery.trim().toUpperCase();
+  const names = q
+    ? all.filter(n => n.includes(q) || labelFor(n).toUpperCase().includes(q) || (keyInfo(n).code || '').includes(q))
+    : all.filter(n => categoryOf(n) === ui.pickerCat);
+  const compact = !q && ['letters', 'numbers', 'fkeys'].includes(ui.pickerCat);
+  const grid = el('div', 'grid' + (compact ? ' narrow' : ''));
+  for (const n of names) {
+    const k = keyInfo(n);
+    const o = el('button', 'opt' + (compact ? ' compact' : '') + (n === current ? ' current' : ''));
+    o.type = 'button';
+    if (compact) o.textContent = k.name;
+    else {
+      if (k.sym) o.appendChild(el('span', 'sym', k.sym));
+      const txt = el('span', 'txt'); txt.appendChild(el('b', null, k.name)); if (k.code) txt.appendChild(el('small', null, k.code)); o.appendChild(txt);
+    }
+    o.addEventListener('click', () => assign(n));
+    grid.appendChild(o);
+  }
+  if (!names.length) grid.appendChild(el('div', null, t('pickerNone')));
+  const foot = el('div', 'picker-foot');
+  const cur = el('span'); cur.appendChild(document.createTextNode(t('pickerCurrent'))); cur.appendChild(el('b', null, labelFor(current)));
+  foot.append(el('span'), cur);
+  p.append(head, search, cats, grid, foot);
+  search.addEventListener('input', () => { ui.pickerQuery = search.value; const pos = search.selectionStart; renderPicker(anchor); const s2 = $('picker').querySelector('input'); s2.focus(); s2.setSelectionRange(pos, pos); });
+  p.hidden = false;
+  // position: below the anchor, kept inside the viewport
+  const r = anchor.getBoundingClientRect();
+  const pw = p.offsetWidth, ph = p.offsetHeight;
+  let left = window.scrollX + r.left, top = window.scrollY + r.bottom + 6;
+  if (r.left + pw > window.innerWidth - 16) left = window.scrollX + Math.max(16, window.innerWidth - 16 - pw);
+  if (r.bottom + ph > window.innerHeight - 16 && r.top - ph - 6 > 0) top = window.scrollY + r.top - ph - 6;
+  p.style.left = left + 'px'; p.style.top = top + 'px';
+  if (!ui.pickerQuery) search.focus();
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ui.picker) { e.preventDefault(); closePicker(); } });
+document.addEventListener('mousedown', (e) => {
+  if (!ui.picker) return;
+  const p = $('picker');
+  if (p.contains(e.target)) return;
+  if (e.target.closest('.key, .cell, .kbtn, .dpad button')) return; // the click handler re-opens for that target
+  closePicker();
+});
+
+// ===========================================================================
+// Live depth (calibration)
+// ===========================================================================
+async function setLiveDepth(on) {
+  if (on && !ui.calib) {
+    try { await fetch('/api/calibration/start', { method: 'POST' }); } catch (e) { return; }
+    ui.calib = setInterval(pollDepth, 150);
+    $('perkey-details').open = true;
+  } else if (!on && ui.calib) {
+    clearInterval(ui.calib); ui.calib = null;
+    ui.depths.fill(0);
+    try { await fetch('/api/calibration/stop', { method: 'POST' }); } catch (e) { /* server times out on its own */ }
+  }
+  renderKeysCard();
+  updateDepthBars();
+}
+async function pollDepth() {
   try {
-    await fetch('/api/language', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ language: lang }),
-    });
-  } catch (e) {
-    // best-effort; the preference just won't persist this time
+    const data = await (await fetch('/api/calibration/live')).json();
+    if (!data.active) { await setLiveDepth(false); return; }
+    for (let i = 0; i < 20 && i < data.depths.length; i++) {
+      ui.depths[i] = data.depths[i];
+      ui.observedMax[i] = Math.max(ui.observedMax[i], data.depths[i]);
+    }
+    updateDepthBars();
+  } catch (e) { /* transient; next poll retries */ }
+}
+function updateDepthBars() {
+  for (let i = 0; i < 20; i++) {
+    const pct = ui.calib ? (ui.depths[i] / 255 * 100) : 0;
+    const k = $('kdepth-' + i); if (k) k.style.height = pct + '%';
+    const d = $('ldot-' + i); if (d) d.classList.toggle('live', ui.calib && ui.depths[i] > 0);
+    const pb = $('pbar-' + i); if (pb) pb.style.width = pct + '%';
+    const pn = $('pnum-' + i); if (pn) pn.textContent = ui.calib ? ui.depths[i] : 0;
+    const pm = $('pmax-' + i); if (pm) pm.textContent = ui.observedMax[i];
   }
 }
 
-// "basic" if currentValue isn't in KEY_CATEGORIES.media — including an
-// unrecognized value, same defensive-fallback spirit as the "unknown key"
-// option below.
-function categoryOf(value) {
-  return KEY_CATEGORIES.media.includes(value) ? 'media' : 'basic';
+// ===========================================================================
+// Save / language
+// ===========================================================================
+async function save() {
+  ui.saveState = 'saving'; renderChip();
+  state.language = ui.lang;
+  try {
+    const res = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state) });
+    const body = await res.json().catch(() => ({}));
+    if (res.ok && body.ok) { savedJson = JSON.stringify(state); ui.saveState = 'saved'; }
+    else { ui.saveState = 'error'; ui.saveError = body.error || String(res.status); }
+  } catch (e) { ui.saveState = 'error'; ui.saveError = String(e); }
+  renderChip();
+  if (ui.saveState === 'saved') setTimeout(() => { if (ui.saveState === 'saved') { ui.saveState = 'clean'; renderChip(); } }, 4000);
+}
+async function setLanguage(lang) {
+  ui.lang = lang;
+  renderAll();
+  try { await fetch('/api/language', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ language: lang }) }); } catch (e) { /* best effort */ }
 }
 
-// Fills a key-value <select> from one category's list, pre-selecting
-// currentValue if given and present. If currentValue is given but absent
-// from the list (either it's genuinely unrecognized, or the user just
-// switched category and the old value doesn't exist in the new one), adds a
-// defensive "(unknown key)" option instead of silently substituting the
-// first entry — same behavior makeSelect had before the category split.
-function fillKeyValueOptions(valSelect, category, currentValue) {
-  valSelect.replaceChildren();
-  const list = KEY_CATEGORIES[category] || [];
-  for (const name of list) {
-    const opt = document.createElement('option');
-    opt.value = name;
-    opt.textContent = name;
-    if (name === currentValue) opt.selected = true;
-    valSelect.appendChild(opt);
-  }
-  if (currentValue != null && !list.includes(currentValue)) {
-    const opt = document.createElement('option');
-    opt.value = currentValue;
-    opt.textContent = currentValue + ' ' + I18N[currentLang].unknownKeySuffix;
-    opt.selected = true;
-    valSelect.appendChild(opt);
-  }
-}
-
-// Two-level key picker (v1.0.5): a small category <select> ("Basic" / "Media
-// Control") next to a value <select> populated from that category's list —
-// #{idPrefix}-cat and #{idPrefix}-val. Choosing a different category
-// repopulates the value select from scratch (defaulting to that category's
-// first entry, since the previous value generally won't exist in the new
-// category's list).
-function makeKeyPicker(idPrefix, currentValue) {
-  const wrap = document.createElement('span');
-  wrap.className = 'key-picker';
-
-  const catSelect = document.createElement('select');
-  catSelect.className = 'key-cat';
-  catSelect.id = idPrefix + '-cat';
-  const catBasic = document.createElement('option');
-  catBasic.value = 'basic';
-  catBasic.dataset.i18n = 'catBasic';
-  catBasic.textContent = I18N[currentLang].catBasic;
-  const catMedia = document.createElement('option');
-  catMedia.value = 'media';
-  catMedia.dataset.i18n = 'catMedia';
-  catMedia.textContent = I18N[currentLang].catMedia;
-  catSelect.append(catBasic, catMedia);
-  catSelect.value = categoryOf(currentValue);
-
-  const valSelect = document.createElement('select');
-  valSelect.className = 'key-val';
-  valSelect.id = idPrefix + '-val';
-  fillKeyValueOptions(valSelect, catSelect.value, currentValue);
-
-  catSelect.addEventListener('change', () => {
-    fillKeyValueOptions(valSelect, catSelect.value, null);
+// ===========================================================================
+// Wiring
+// ===========================================================================
+function wire() {
+  $('save-btn').addEventListener('click', save);
+  document.querySelectorAll('#lang-seg button').forEach(b => b.addEventListener('click', () => setLanguage(b.dataset.lang)));
+  document.querySelectorAll('#view-seg button').forEach(b => b.addEventListener('click', () => { ui.view = b.dataset.view; closePicker(); renderKeysCard(); }));
+  document.querySelectorAll('#layer-seg button').forEach(b => b.addEventListener('click', () => { const l = Number(b.dataset.layer); if (l < reachableLayers()) { ui.layer = l; closePicker(); renderKeypad(); } }));
+  $('depth-switch').addEventListener('click', () => setLiveDepth(!ui.calib));
+  $('copy-l1').addEventListener('click', () => { if (confirm(t('copyConfirm'))) { state.keys_layer1 = state.keys_default.slice(); renderList(); renderChip(); } });
+  const onT = () => { state.t_on = Number($('t-on').value); state.t_off = Math.min(Number($('t-off').value), state.t_on - 1); renderActuation(); renderChip(); };
+  $('t-on').addEventListener('input', onT); $('t-off').addEventListener('input', onT);
+  document.querySelectorAll('#hs-mode-seg button').forEach(b => b.addEventListener('click', () => { state.hypershift_mode = b.dataset.mode; closePicker(); renderHypershift(); renderKeysCard(); renderChip(); }));
+  $('hs-style').addEventListener('change', () => { state.hypershift_switch_style = $('hs-style').value; renderHypershift(); renderKeysCard(); renderChip(); });
+  $('hs-count').addEventListener('change', () => { state.hypershift_layer_count = Number($('hs-count').value); renderHypershift(); renderKeysCard(); renderChip(); });
+  document.querySelectorAll('#effect-chips button').forEach(b => b.addEventListener('click', () => { state.lighting_effect = b.dataset.effect; renderLighting(); renderChip(); }));
+  $('lighting-color').addEventListener('input', () => { state.lighting_color = $('lighting-color').value.replace('#', '').toUpperCase(); $('lighting-color-hex').textContent = '#' + state.lighting_color; renderChip(); });
+  $('lighting-brightness').addEventListener('input', () => { state.lighting_brightness = Number($('lighting-brightness').value); $('lighting-brightness-val').textContent = state.lighting_brightness; renderChip(); });
+  $('lighting-direction').addEventListener('change', () => { state.lighting_wave_direction = $('lighting-direction').value; renderChip(); });
+  $('lighting-speed').addEventListener('change', () => { state.lighting_reactive_speed = Number($('lighting-speed').value); renderChip(); });
+  $('indicator-switch').addEventListener('click', () => { state.layer_indicator_enabled = !state.layer_indicator_enabled; renderIndicator(); renderChip(); });
+  document.querySelectorAll('#indicator-swatches button').forEach(b => b.addEventListener('click', () => { state.layer_indicator_color = b.dataset.color; renderIndicator(); renderChip(); }));
+  window.addEventListener('beforeunload', (e) => {
+    if (ui.calib) navigator.sendBeacon('/api/calibration/stop');
+    if (isDirty()) { e.preventDefault(); e.returnValue = ''; }
   });
-
-  wrap.append(catSelect, valSelect);
-  return wrap;
-}
-
-function fillSlot(slotId, idPrefix, value) {
-  const slot = document.getElementById(slotId);
-  slot.replaceChildren(makeKeyPicker(idPrefix, value));
-}
-
-function pickerValue(idPrefix) {
-  return document.getElementById(idPrefix + '-val').value;
+  window.addEventListener('resize', () => { if (ui.picker) closePicker(); });
 }
 
 async function init() {
-  const [options, config, versionInfo] = await Promise.all([
+  const [options, config, version, status] = await Promise.all([
     fetch('/api/key-options').then(r => r.json()),
     fetch('/api/config').then(r => r.json()),
     fetch('/api/version').then(r => r.json()).catch(() => null),
+    fetch('/api/status').then(r => r.json()).catch(() => null),
   ]);
-  KEY_CATEGORIES = options;
-  applyLanguage(config.language || 'en');
-  if (versionInfo && versionInfo.version) {
-    document.getElementById('version-tag').textContent = 'v' + versionInfo.version;
-  }
-
-  const tbody = document.getElementById('analog-body');
-  const rows = [];
-  for (let i = 0; i < 20; i++) {
-    const label = 'key' + String(i + 1).padStart(2, '0');
-    const tr = document.createElement('tr');
-    const tdLabel = document.createElement('td');
-    tdLabel.textContent = label;
-    const tdDefault = document.createElement('td');
-    const tdLayer1 = document.createElement('td');
-    tdLayer1.dataset.layer = '1';
-    const tdLayer2 = document.createElement('td');
-    tdLayer2.dataset.layer = '2';
-    tdDefault.appendChild(makeKeyPicker('analog-default-' + i, config.keys_default[i]));
-    tdLayer1.appendChild(makeKeyPicker('analog-layer1-' + i, config.keys_layer1[i]));
-    tdLayer2.appendChild(makeKeyPicker('analog-layer2-' + i, config.keys_layer2[i]));
-    tr.append(tdLabel, tdDefault, tdLayer1, tdLayer2);
-    rows.push(tr);
-  }
-  tbody.replaceChildren(...rows);
-
-  document.getElementById('hypershift-mode').value = config.hypershift_mode;
-  document.getElementById('hypershift-switch-style').value = config.hypershift_switch_style;
-  document.getElementById('hypershift-layer-count').value = String(config.hypershift_layer_count);
-  fillSlot('slot-hypershift-modifier-key', 'hypershift-modifier-key', config.hypershift_modifier_key);
-  updateHypershiftFieldVisibility();
-
-  fillSlot('slot-dpad-left', 'dpad-left', config.dpad_left);
-  fillSlot('slot-dpad-up', 'dpad-up', config.dpad_up);
-  fillSlot('slot-dpad-right', 'dpad-right', config.dpad_right);
-  fillSlot('slot-dpad-down', 'dpad-down', config.dpad_down);
-  fillSlot('slot-wheel-up', 'wheel-up', config.wheel_up);
-  fillSlot('slot-wheel-down', 'wheel-down', config.wheel_down);
-  fillSlot('slot-middle-click', 'middle-click', config.middle_click);
-
-  document.getElementById('t-on').value = config.t_on;
-  document.getElementById('t-off').value = config.t_off;
-  buildPerKeyActuationTable(config);
-
-  document.getElementById('lighting-effect').value = config.lighting_effect;
-  document.getElementById('lighting-color').value = '#' + config.lighting_color;
-  document.getElementById('lighting-brightness').value = config.lighting_brightness;
-  document.getElementById('lighting-direction').value = config.lighting_wave_direction;
-  document.getElementById('lighting-speed').value = config.lighting_reactive_speed;
-  updateLightingFieldVisibility();
-
-  document.getElementById('layer-indicator-enabled').checked = config.layer_indicator_enabled;
-  document.getElementById('layer-indicator-color').value = config.layer_indicator_color;
+  KEYS = options;
+  state = config;
+  savedJson = JSON.stringify(state);
+  ui.lang = I18N[config.language] ? config.language : 'en';
+  ui.status = status;
+  ui.platform = status ? status.platform : (navigator.platform.toLowerCase().includes('mac') ? 'macos' : 'windows');
+  if (version && version.version) $('version-tag').textContent = 'driver v' + version.version;
+  wire();
+  renderAll();
 }
-
-function buildPerKeyActuationTable(config) {
-  const tbody = document.getElementById('perkey-body');
-  const rows = [];
-  for (let i = 0; i < 20; i++) {
-    const label = 'key' + String(i + 1).padStart(2, '0');
-    const hasOverride = config.per_key_t_on[i] != null && config.per_key_t_off[i] != null;
-
-    const tr = document.createElement('tr');
-
-    const tdLabel = document.createElement('td');
-    tdLabel.textContent = label;
-
-    const tdDepth = document.createElement('td');
-    const barWrap = document.createElement('span');
-    barWrap.className = 'depth-bar-wrap';
-    const bar = document.createElement('div');
-    bar.className = 'depth-bar';
-    bar.id = 'depth-bar-' + i;
-    barWrap.appendChild(bar);
-    const depthNum = document.createElement('span');
-    depthNum.id = 'depth-num-' + i;
-    depthNum.textContent = '0';
-    tdDepth.append(barWrap, depthNum);
-
-    const tdMax = document.createElement('td');
-    tdMax.id = 'depth-max-' + i;
-    tdMax.textContent = '0';
-
-    const tdEnable = document.createElement('td');
-    const enableCheckbox = document.createElement('input');
-    enableCheckbox.type = 'checkbox';
-    enableCheckbox.id = 'perkey-enable-' + i;
-    enableCheckbox.checked = hasOverride;
-    tdEnable.appendChild(enableCheckbox);
-
-    const tdTon = document.createElement('td');
-    const tonInput = document.createElement('input');
-    tonInput.type = 'number';
-    tonInput.min = 1;
-    tonInput.max = 255;
-    tonInput.id = 'perkey-ton-' + i;
-    tonInput.value = hasOverride ? config.per_key_t_on[i] : config.t_on;
-    tonInput.disabled = !hasOverride;
-    tdTon.appendChild(tonInput);
-
-    const tdToff = document.createElement('td');
-    const toffInput = document.createElement('input');
-    toffInput.type = 'number';
-    toffInput.min = 0;
-    toffInput.max = 254;
-    toffInput.id = 'perkey-toff-' + i;
-    toffInput.value = hasOverride ? config.per_key_t_off[i] : config.t_off;
-    toffInput.disabled = !hasOverride;
-    tdToff.appendChild(toffInput);
-
-    enableCheckbox.addEventListener('change', () => {
-      tonInput.disabled = !enableCheckbox.checked;
-      toffInput.disabled = !enableCheckbox.checked;
-    });
-
-    tr.append(tdLabel, tdDepth, tdMax, tdEnable, tdTon, tdToff);
-    rows.push(tr);
-  }
-  tbody.replaceChildren(...rows);
-}
-
-let calibrationTimer = null;
-const observedMax = new Array(20).fill(0);
-
-function updateCalibButtonText() {
-  const btn = document.getElementById('calib-toggle-btn');
-  btn.textContent = calibrationTimer ? I18N[currentLang].btnCalibStop : I18N[currentLang].btnCalibStart;
-}
-
-async function toggleCalibration() {
-  const status = document.getElementById('calib-status');
-
-  if (calibrationTimer) {
-    clearInterval(calibrationTimer);
-    calibrationTimer = null;
-    updateCalibButtonText();
-    status.textContent = '';
-    try {
-      await fetch('/api/calibration/stop', { method: 'POST' });
-    } catch (e) {
-      // best-effort; the server times out on its own after 10 minutes regardless
-    }
-    return;
-  }
-
-  try {
-    await fetch('/api/calibration/start', { method: 'POST' });
-  } catch (e) {
-    status.textContent = I18N[currentLang].statusNetworkErrorPrefix + e;
-    return;
-  }
-  calibrationTimer = setInterval(pollCalibration, 150);
-  updateCalibButtonText();
-  status.textContent = I18N[currentLang].calibPromptPressKeys;
-}
-
-async function pollCalibration() {
-  try {
-    const res = await fetch('/api/calibration/live');
-    const data = await res.json();
-    if (!data.active) {
-      clearInterval(calibrationTimer);
-      calibrationTimer = null;
-      updateCalibButtonText();
-      document.getElementById('calib-status').textContent = I18N[currentLang].calibTimeoutMsg;
-      return;
-    }
-    for (let i = 0; i < 20 && i < data.depths.length; i++) {
-      const depth = data.depths[i];
-      observedMax[i] = Math.max(observedMax[i], depth);
-      document.getElementById('depth-num-' + i).textContent = depth;
-      document.getElementById('depth-bar-' + i).style.width = (depth / 255 * 100) + '%';
-      document.getElementById('depth-max-' + i).textContent = observedMax[i];
-    }
-  } catch (e) {
-    // transient network hiccup; the next poll retries on its own
-  }
-}
-
-function updateLightingFieldVisibility() {
-  const effect = document.getElementById('lighting-effect').value;
-  const setVisible = (id, visible) => {
-    document.getElementById(id).style.display = visible ? '' : 'none';
-  };
-  setVisible('lighting-color-field', ['static', 'breathing', 'reactive'].includes(effect));
-  setVisible('lighting-brightness-field', effect !== 'none');
-  setVisible('lighting-direction-field', effect === 'wave');
-  setVisible('lighting-speed-field', effect === 'reactive');
-}
-
-function updateHypershiftFieldVisibility() {
-  const mode = document.getElementById('hypershift-mode').value;
-  const style = document.getElementById('hypershift-switch-style').value;
-  const setVisible = (id, visible) => {
-    document.getElementById(id).style.display = visible ? '' : 'none';
-  };
-  setVisible('hypershift-switch-style-field', mode === 'layer_switch');
-  setVisible('hypershift-layer-count-field', mode === 'layer_switch' && style === 'toggle');
-  setVisible('hypershift-modifier-key-field', mode === 'modifier_key');
-  updateLayerColumnAvailability();
-}
-
-// How many of the Analog Keys table's layer columns (Default always counts
-// as 1) are actually reachable given the current Hyper Shift settings:
-// modifier_key mode never switches layers at all (1, Default only);
-// momentary is always exactly 2 (Default/Layer1); toggle reaches
-// layer_count (2 or 3). Columns beyond that count are shown hatched
-// (.layer-col-unreachable) — still editable (config.toml keeps whatever is
-// there either way), just visually marked as not currently in play.
-function reachableLayerCount() {
-  const mode = document.getElementById('hypershift-mode').value;
-  if (mode === 'modifier_key') return 1;
-  const style = document.getElementById('hypershift-switch-style').value;
-  if (style === 'toggle') return Number(document.getElementById('hypershift-layer-count').value);
-  return 2; // momentary
-}
-
-function updateLayerColumnAvailability() {
-  const reachable = reachableLayerCount();
-  for (const layer of [1, 2]) {
-    const unreachable = layer >= reachable;
-    document.querySelectorAll('[data-layer="' + layer + '"]').forEach(el => {
-      el.classList.toggle('layer-col-unreachable', unreachable);
-    });
-  }
-}
-
-function perKeyValues(inputIdPrefix) {
-  const values = [];
-  for (let i = 0; i < 20; i++) {
-    const enabled = document.getElementById('perkey-enable-' + i).checked;
-    values.push(enabled ? Number(document.getElementById(inputIdPrefix + i).value) : null);
-  }
-  return values;
-}
-
-async function save() {
-  const status = document.getElementById('status');
-  const btn = document.getElementById('save-btn');
-  btn.disabled = true;
-  status.textContent = I18N[currentLang].statusSaving;
-  status.className = '';
-
-  const keysDefault = [];
-  const keysLayer1 = [];
-  const keysLayer2 = [];
-  for (let i = 0; i < 20; i++) {
-    keysDefault.push(pickerValue('analog-default-' + i));
-    keysLayer1.push(pickerValue('analog-layer1-' + i));
-    keysLayer2.push(pickerValue('analog-layer2-' + i));
-  }
-
-  const payload = {
-    keys_default: keysDefault,
-    keys_layer1: keysLayer1,
-    keys_layer2: keysLayer2,
-    hypershift_mode: document.getElementById('hypershift-mode').value,
-    hypershift_switch_style: document.getElementById('hypershift-switch-style').value,
-    hypershift_layer_count: Number(document.getElementById('hypershift-layer-count').value),
-    hypershift_modifier_key: pickerValue('hypershift-modifier-key'),
-    dpad_left: pickerValue('dpad-left'),
-    dpad_up: pickerValue('dpad-up'),
-    dpad_right: pickerValue('dpad-right'),
-    dpad_down: pickerValue('dpad-down'),
-    wheel_up: pickerValue('wheel-up'),
-    wheel_down: pickerValue('wheel-down'),
-    middle_click: pickerValue('middle-click'),
-    t_on: Number(document.getElementById('t-on').value),
-    t_off: Number(document.getElementById('t-off').value),
-    per_key_t_on: perKeyValues('perkey-ton-'),
-    per_key_t_off: perKeyValues('perkey-toff-'),
-    lighting_effect: document.getElementById('lighting-effect').value,
-    lighting_color: document.getElementById('lighting-color').value.replace('#', '').toUpperCase(),
-    lighting_brightness: Number(document.getElementById('lighting-brightness').value),
-    lighting_wave_direction: document.getElementById('lighting-direction').value,
-    lighting_reactive_speed: Number(document.getElementById('lighting-speed').value),
-    layer_indicator_enabled: document.getElementById('layer-indicator-enabled').checked,
-    layer_indicator_color: document.getElementById('layer-indicator-color').value,
-    language: currentLang,
-  };
-
-  try {
-    const res = await fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const body = await res.json();
-    if (res.ok && body.ok) {
-      status.textContent = I18N[currentLang].statusSaved;
-      status.className = 'ok';
-    } else {
-      status.textContent = I18N[currentLang].statusErrorPrefix + (body.error || res.status);
-      status.className = 'err';
-    }
-  } catch (e) {
-    status.textContent = I18N[currentLang].statusNetworkErrorPrefix + e;
-    status.className = 'err';
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-document.getElementById('save-btn').addEventListener('click', save);
-document.getElementById('lighting-effect').addEventListener('change', updateLightingFieldVisibility);
-document.getElementById('hypershift-mode').addEventListener('change', updateHypershiftFieldVisibility);
-document.getElementById('hypershift-switch-style').addEventListener('change', updateHypershiftFieldVisibility);
-document.getElementById('hypershift-layer-count').addEventListener('change', updateLayerColumnAvailability);
-document.getElementById('calib-toggle-btn').addEventListener('click', toggleCalibration);
-document.getElementById('language-select').addEventListener('change', (e) => setLanguage(e.target.value));
-window.addEventListener('beforeunload', () => {
-  if (calibrationTimer) {
-    navigator.sendBeacon('/api/calibration/stop');
-  }
-});
 init();
 </script>
 </body>
