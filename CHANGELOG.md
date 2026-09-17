@@ -7,7 +7,7 @@
 <a name="english"></a>
 ## English
 
-### Unreleased
+### v1.2.0
 
 - **Changed**: the `configui` settings page is redesigned. It now draws the keypad — click a key, D-pad direction, the wheel or the thumb button to assign it from a searchable, categorised key picker (modifiers shown with their symbols on macOS) — with Default / Layer 1 / Layer 2 tabs, a List view of every control and layer, live key depth shown on the keypad itself, per-section instructions, a header chip for the unsaved/saved state, and a Driver status card (new `/api/status` endpoint; reports root/`sudo` state on macOS when the page is served by the tray-mode driver). Same `config.toml`, same driver behaviour.
 
@@ -79,7 +79,7 @@ Initial public release.
 <a name="japanese"></a>
 ## 日本語
 
-### 未リリース
+### v1.2.0
 
 - **変更**: `configui`設定ページを刷新。キーパッドの絵からキー・十字キー・ホイール・親指ボタンをクリックして、検索とカテゴリ付きのキーピッカーで割り当てる方式になった(macOSでは修飾キーを記号付きで表示)。通常 / Layer 1 / Layer 2 タブ、全操作部・全レイヤーの一覧表示、キーパッド上での押し込み深さのライブ表示、セクションごとの説明、ヘッダーでの保存状態表示、ドライバの状態カード(新しい`/api/status`。trayモードのドライバから配信されている場合、macOSではroot/`sudo`の状態を表示)を追加。`config.toml`の形式とドライバの動作は変更なし。
 
