@@ -27,17 +27,13 @@
 
 ### Screenshots
 
-`configui`, the browser-based config page — remap every analog key across up to 3 layers (Default/Layer1/Layer2), configure Hyper Shift's mode, and pick media/volume keys from their own category:
+`configui`, the browser-based settings page — the keypad is drawn as it is on the device: click any key, D-pad direction, the wheel or the thumb button to assign it from a searchable key picker, switch layers with the Default / Layer 1 / Layer 2 tabs, and watch live key depth on the keys themselves while tuning actuation:
 
-![configui: key remap settings](img/configgui_1.png)
+![configui: keypad view](img/configui_keypad.png)
 
-Live sensitivity calibration — watch each key's raw depth in real time while dialing in per-key `t_on`/`t_off` overrides:
+The List view shows every control and every layer in one table (unreachable layers hatched), with Hyper Shift, lighting, the layer-indicator LED and the driver's status alongside:
 
-![configui: live calibration](img/configgui_2.png)
-
-Media/volume keys as their own category in the key picker — here the wheel and middle-click are remapped to Volume Up/Down and Play/Pause:
-
-![configui: media control key picker](img/configgui_3.png)
+![configui: list view](img/configui_list.png)
 
 ### Requirements
 
@@ -136,17 +132,13 @@ Licensed under the **[GNU General Public License v3.0 (GPL-3.0)](LICENSE)**.
 
 ### スクリーンショット
 
-`configui`(ブラウザの設定画面)— 全アナログキーを最大3レイヤー(通常/Layer1/Layer2)分リマップし、ハイパーシフトのモードやメディア/音量キーもカテゴリから選択できる:
+`configui`(ブラウザの設定画面)— キーパッドが実機と同じ配置で描かれ、キー・十字キーの方向・ホイール・親指ボタンをクリックして検索付きのキーピッカーから割り当てる。通常 / Layer 1 / Layer 2 タブでレイヤーを切り替え、アクチュエーション調整中はキー上に押し込み深さがそのまま表示される:
 
-![configui: キー割り当て設定](img/configgui_1.png)
+![configui: キーパッド表示](img/configui_keypad.png)
 
-リアルタイム感度キャリブレーション — 各キーの生の押し込み深度を見ながら、キーごとの`t_on`/`t_off`を調整できる:
+一覧表示では全操作部・全レイヤーが1つの表に並び(到達できないレイヤーはハッチング表示)、ハイパーシフト・ライティング・レイヤーインジケータLED・ドライバの状態も同じ画面にまとまっている:
 
-![configui: ライブキャリブレーション](img/configgui_2.png)
-
-キーピッカーの「メディア操作」カテゴリ — ここではホイールと中クリックを音量上げ/下げ・再生一時停止に割り当てている:
-
-![configui: メディア操作キーピッカー](img/configgui_3.png)
+![configui: 一覧表示](img/configui_list.png)
 
 ### 動作環境
 
