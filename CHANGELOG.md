@@ -7,6 +7,10 @@
 <a name="english"></a>
 ## English
 
+### Unreleased
+
+- **Added** (`configui`): an **Undo changes** button in the header that reverts every unsaved edit to the last saved config.
+
 ### v1.2.1
 
 - **Fixed**: `cargo test` could type real keystrokes into the focused window (the emulate harness test reaches the key pipeline; with the macOS backend this posted four "5"s). Tests now use a logging stand-in for key emission on every OS. No change to the shipped driver.
@@ -83,6 +87,10 @@ Initial public release.
 
 <a name="japanese"></a>
 ## 日本語
+
+### 未リリース
+
+- **追加**(`configui`): ヘッダーに**変更を取り消す**ボタンを追加。未保存の編集をすべて最後に保存した状態に戻す。
 
 ### v1.2.1
 

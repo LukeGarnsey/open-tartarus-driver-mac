@@ -84,8 +84,10 @@
   }
   .btn-primary:disabled { opacity: 0.55; cursor: default; box-shadow: none; }
   .btn-secondary {
-    padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 13px;
+    padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font-size: 14px; font-weight: 600;
   }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-secondary:disabled { opacity: 0.45; cursor: default; border-color: var(--border); color: var(--muted); }
 
   /* segmented control */
   .seg { display: inline-flex; padding: 3px; background: var(--bg); border: 1px solid var(--border); border-radius: 9px; font-size: 13px; gap: 2px; }
@@ -303,6 +305,7 @@
       <button type="button" data-lang="en">EN</button>
       <button type="button" data-lang="ja">日本語</button>
     </div>
+    <button type="button" class="btn-secondary" id="undo-btn" data-i18n="btnUndo">Undo changes</button>
     <button type="button" class="btn-primary" id="save-btn" data-i18n="btnSave">Save</button>
   </div>
 </header>
@@ -530,6 +533,7 @@
 const I18N = {
   en: {
     btnSave: "Save",
+    btnUndo: "Undo changes",
     chipClean: "All changes saved",
     chipDirty: "Unsaved changes",
     chipSaving: "Saving…",
@@ -625,6 +629,7 @@ const I18N = {
   },
   ja: {
     btnSave: "保存",
+    btnUndo: "変更を取り消す",
     chipClean: "すべて保存済み",
     chipDirty: "未保存の変更",
     chipSaving: "保存中…",
@@ -816,6 +821,7 @@ function renderChip() {
   text.textContent = label;
   dot.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="' + icon + '"></path></svg>';
   $('save-btn').disabled = ui.saveState === 'saving';
+  $('undo-btn').disabled = !dirty || ui.saveState === 'saving';
 }
 
 function renderKeysCard() {
@@ -1197,8 +1203,17 @@ async function setLanguage(lang) {
 // ===========================================================================
 // Wiring
 // ===========================================================================
+function undoChanges() {
+  if (!isDirty()) return;
+  closePicker();
+  state = JSON.parse(savedJson);
+  ui.saveState = 'clean';
+  renderAll();
+}
+
 function wire() {
   $('save-btn').addEventListener('click', save);
+  $('undo-btn').addEventListener('click', undoChanges);
   document.querySelectorAll('#lang-seg button').forEach(b => b.addEventListener('click', () => setLanguage(b.dataset.lang)));
   document.querySelectorAll('#view-seg button').forEach(b => b.addEventListener('click', () => { ui.view = b.dataset.view; closePicker(); renderKeysCard(); }));
   document.querySelectorAll('#layer-seg button').forEach(b => b.addEventListener('click', () => { const l = Number(b.dataset.layer); if (l < reachableLayers()) { ui.layer = l; closePicker(); renderKeypad(); } }));
