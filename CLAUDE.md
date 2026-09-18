@@ -6,8 +6,10 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
 
 ## Where things are
 
-- **Branch `macos-port`** holds all port work. `main` tracks upstream; don't
-  commit port work there.
+- All work is on **`main`** (the `macos-port` branch was merged fast-forward
+  and deleted on 2026-09-18 once the port shipped). Upstream
+  `ultramonaka/open-tartarus-driver` is what `main` was forked from; keep
+  the Windows side unchanged so a PR upstream stays possible.
 - **`docs/MACOS_PORT_PLAN.md`** is the plan: phases, verified macOS facts,
   risks. Read it before starting a phase. Update it when reality differs.
 - Crate: `tartarus_driver/` (edition 2024). Run cargo from there.
@@ -51,6 +53,11 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
   launch = `tray`, `scripts/macos/make-app.sh` (universal, signed .app),
   LaunchAgent sample, `release.yml` macOS job, README/USAGE §9/CHANGELOG
   in EN + JA. Verified from Finder with fresh TCC grants.
+- **Shipped**: v1.1.0 (port), v1.1.1 (punctuation keys, fixes), v1.2.0
+  (redesigned `configui` page: drawn keypad, key picker, list view, live
+  depth, status card via `/api/status`), v1.2.1 (polish; `cargo test` no
+  longer types), v1.2.2 (Undo changes). Releases: tag `vX.Y.Z` on `main`
+  → `release.yml` builds both zips.
 - **All four phases are complete.** Remaining ideas, none started: root
   LaunchDaemon for D-pad at login (TCC in a daemon context unverified),
   reattach after unplug (reader threads currently exit), `emulate`
@@ -143,4 +150,8 @@ every push.
 - Log lines are user-facing (USAGE.md tells users to grep for some of
   them); keep existing phrases stable.
 - Commit messages: end with the Claude attribution lines the harness
-  provides; don't push unless asked.
+  provides; don't push unless asked. Pushes and tag pushes are done by
+  the user from their terminal (the harness blocks remote writes here);
+  give them `git push origin main`, `git tag vX.Y.Z`, `git push origin
+  vX.Y.Z` as separate commands — chained ones have silently skipped the
+  tag push before.
