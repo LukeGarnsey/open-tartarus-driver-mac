@@ -32,3 +32,6 @@ interception.dll
 
 # Output of scripts/make-public-release-zip.ps1
 /dist/
+
+# macOS Finder metadata
+.DS_Store
