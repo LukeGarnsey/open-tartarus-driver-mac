@@ -7,7 +7,7 @@
 <a name="english"></a>
 ## English
 
-### Unreleased
+### v1.2.3
 
 - **Fixed (macOS)**: a modifier held on the Tartarus (Shift/Control/Option/Command) now applies to **mouse clicks, drags and the real keyboard** too — Shift-click, Shift-drag (e.g. Photoshop's straight-line brush), Shift+letter on the physical keyboard. Previously it only affected keys sent by the Tartarus itself: macOS stamps hardware events with the physical modifier state, which a synthetic modifier never reaches. The driver now runs a small event tap ("modifier bridge", logged at startup) that adds its held modifiers to passing events; it needs the same Accessibility permission the driver already uses. Modifier presses are also sent as proper flags-changed events, as a real keyboard would.
 
@@ -92,7 +92,7 @@ Initial public release.
 <a name="japanese"></a>
 ## 日本語
 
-### 未リリース
+### v1.2.3
 
 - **修正(macOS)**: Tartarus側で押し続けている修飾キー(Shift/Control/Option/Command)が、**マウスのクリック・ドラッグや実キーボード**にも効くようになった — Shift+クリック、Shift+ドラッグ(Photoshopの直線ブラシなど)、実キーボードでのShift+文字。以前はTartarus自身が送るキーにしか効いていなかった(macOSはハードウェアのイベントに物理的な修飾キー状態を付与するため、合成した修飾キーは反映されない)。ドライバに小さなイベントタップ(「modifier bridge」、起動時にログ出力)を追加し、通過するイベントに保持中の修飾キーを付け加えるようにした。必要な権限はドライバが既に使っているアクセシビリティのみ。修飾キーの押下/解放も実キーボードと同じflags-changedイベントとして送信するように変更。
 
