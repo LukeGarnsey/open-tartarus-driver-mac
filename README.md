@@ -27,13 +27,21 @@
 
 ### Screenshots
 
-`configui`, the browser-based settings page — the keypad is drawn as it is on the device: click any key, D-pad direction, the wheel or the thumb button to assign it from a searchable key picker, switch layers with the Default / Layer 1 / Layer 2 tabs, and watch live key depth on the keys themselves while tuning actuation:
+`configui`, the browser-based settings page. **Keypad view** — the keypad is drawn as it is on the device: click any key, D-pad direction, the wheel or the thumb button to assign it from a searchable key picker; the Default / Layer 1 / Layer 2 tabs switch which layer you're editing. Hyper Shift and lighting live in the cards on the right:
 
 ![configui: keypad view](img/configui_keypad.png)
 
-The List view shows every control and every layer in one table (unreachable layers hatched), with Hyper Shift, lighting, the layer-indicator LED and the driver's status alongside:
+**List view** — every control and every layer in one table, unreachable layers hatched, modifiers shown with their symbols:
 
 ![configui: list view](img/configui_list.png)
+
+The thumb controls (D-pad, wheel, wheel click, Hyper Shift button) follow the 20 keys in the same table, and "Copy Default → Layer 1" gets a new layer started:
+
+![configui: list view, thumb controls](img/configui_list_thumb.png)
+
+**Actuation and status** — press/release thresholds, per-key overrides with live key depth, the (experimental) layer-indicator LED, and a Driver status card that says exactly what's running — here without `sudo`, so the D-pad half is flagged:
+
+![configui: actuation and driver status](img/configui_status.png)
 
 ### Requirements
 
@@ -132,13 +140,21 @@ Licensed under the **[GNU General Public License v3.0 (GPL-3.0)](LICENSE)**.
 
 ### スクリーンショット
 
-`configui`(ブラウザの設定画面)— キーパッドが実機と同じ配置で描かれ、キー・十字キーの方向・ホイール・親指ボタンをクリックして検索付きのキーピッカーから割り当てる。通常 / Layer 1 / Layer 2 タブでレイヤーを切り替え、アクチュエーション調整中はキー上に押し込み深さがそのまま表示される:
+`configui`(ブラウザの設定画面)。**キーパッド表示** — キーパッドが実機と同じ配置で描かれ、キー・十字キーの方向・ホイール・親指ボタンをクリックして検索付きのキーピッカーから割り当てる。通常 / Layer 1 / Layer 2 タブで編集するレイヤーを切り替える。ハイパーシフトとライティングは右側のカードにある:
 
 ![configui: キーパッド表示](img/configui_keypad.png)
 
-一覧表示では全操作部・全レイヤーが1つの表に並び(到達できないレイヤーはハッチング表示)、ハイパーシフト・ライティング・レイヤーインジケータLED・ドライバの状態も同じ画面にまとまっている:
+**一覧表示** — 全操作部・全レイヤーが1つの表に並ぶ。到達できないレイヤーはハッチング表示、修飾キーは記号付き:
 
 ![configui: 一覧表示](img/configui_list.png)
+
+親指側の操作(十字キー・ホイール・ホイールクリック・ハイパーシフトボタン)も20キーに続けて同じ表に並び、「通常 → Layer 1 にコピー」で新しいレイヤーをすぐ作れる:
+
+![configui: 一覧表示(親指側の操作)](img/configui_list_thumb.png)
+
+**アクチュエーションと状態** — 押下/解放のしきい値、押し込み深さのライブ表示付きのキー別設定、(実験的機能の)レイヤーインジケータLED、そして何が動いているかを正確に示すドライバの状態カード。ここでは`sudo`なしで起動しているため、十字キー側が制限ありと表示されている:
+
+![configui: アクチュエーションとドライバの状態](img/configui_status.png)
 
 ### 動作環境
 
