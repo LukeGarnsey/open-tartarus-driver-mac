@@ -85,7 +85,17 @@ unsafe extern "C" {
     fn CGEventCreateKeyboardEvent(source: *mut c_void, virtual_key: u16, key_down: bool) -> *mut c_void;
     fn CGEventGetFlags(event: *mut c_void) -> u64;
     fn CGEventSetFlags(event: *mut c_void, flags: u64);
+    fn CGEventSetType(event: *mut c_void, event_type: u32);
     fn CGEventPost(tap: u32, event: *mut c_void);
+    fn CGEventTapCreate(
+        tap: u32,
+        place: u32,
+        options: u32,
+        events_of_interest: u64,
+        callback: extern "C" fn(*mut c_void, u32, *mut c_void, *mut c_void) -> *mut c_void,
+        user_info: *mut c_void,
+    ) -> *mut c_void;
+    fn CGEventTapEnable(tap: *mut c_void, enable: bool);
     fn AXIsProcessTrustedWithOptions(options: *const c_void) -> bool;
     static kAXTrustedCheckOptionPrompt: *const c_void;
 }
@@ -103,6 +113,11 @@ unsafe extern "C" {
     static kCFBooleanTrue: *const c_void;
     static kCFTypeDictionaryKeyCallBacks: c_void;
     static kCFTypeDictionaryValueCallBacks: c_void;
+    fn CFMachPortCreateRunLoopSource(allocator: *const c_void, port: *mut c_void, order: isize) -> *mut c_void;
+    fn CFRunLoopGetCurrent() -> *mut c_void;
+    fn CFRunLoopAddSource(rl: *mut c_void, source: *mut c_void, mode: *const c_void);
+    fn CFRunLoopRun();
+    static kCFRunLoopCommonModes: *const c_void;
 }
 // AppKit has to be linked for `class!(NSEvent)` to resolve at runtime.
 #[link(name = "AppKit", kind = "framework")]
@@ -113,6 +128,8 @@ unsafe extern "C" {
 
 const CG_EVENT_SOURCE_STATE_COMBINED_SESSION: i32 = 0;
 const CG_HID_EVENT_TAP: u32 = 0;
+// CGEventType
+const CG_EVENT_FLAGS_CHANGED: u32 = 12;
 
 // CGEventFlags (CoreGraphics/CGEventTypes.h)
 const CG_FLAG_SHIFT: u64 = 1 << 17;
@@ -198,12 +215,23 @@ fn event_source() -> *mut c_void {
         .0
 }
 
-fn post_keyboard_event(code: u16, key_up: bool, set: u64, clear: u64) {
+fn post_keyboard_event(code: u16, key_up: bool, is_modifier: bool, set: u64, clear: u64) {
     unsafe {
         let ev = CGEventCreateKeyboardEvent(event_source(), code, !key_up);
         if ev.is_null() {
             eprintln!("WARNING: CGEventCreateKeyboardEvent failed for keycode {code:#x}");
             return;
+        }
+        // A real keyboard reports a modifier press/release as a
+        // *flags-changed* event, not a key-down/up. Posting it as a plain
+        // key event is enough for the flag to ride along on later letters
+        // (TextEdit types uppercase), but apps that track modifiers by
+        // listening for the flags-changed transition itself — Photoshop's
+        // tool modifiers, for one (observed 2026-09-18: a held Shift only
+        // registered as a tap) — never see the hold. So modifiers go out
+        // with the type a hardware keyboard would use.
+        if is_modifier {
+            CGEventSetType(ev, CG_EVENT_FLAGS_CHANGED);
         }
         // Start from the physical keyboard's modifiers (see module doc),
         // then apply what this driver holds.
@@ -273,7 +301,7 @@ pub fn send_key(key: Key, key_up: bool) {
                 clear = c;
                 Some(next)
             });
-            post_keyboard_event(code, key_up, set, clear);
+            post_keyboard_event(code, key_up, modifier_bits(key).is_some(), set, clear);
         }
         MacKey::Media(nx) => post_media_event(nx, key_up),
         // Config parsing (Key::from_name) already refuses these on macOS,
@@ -289,6 +317,95 @@ pub fn send_key(key: Key, key_up: bool) {
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Modifier bridge: make held modifiers apply to hardware events too
+// ---------------------------------------------------------------------------
+//
+// A modifier posted with CGEventPost updates every modifier-state view the
+// window server exposes (CGEventSourceFlagsState for both the HID-system
+// and combined-session ids reports it held), and it rides along on the
+// synthetic key events this driver stamps itself — so a Tartarus LSHIFT +
+// Tartarus letter types uppercase. But the flags on *hardware* events
+// (mouse clicks/drags, the real keyboard) are stamped by the kernel HID
+// layer from physical modifier state, which a posted event never reaches:
+// verified 2026-09-18 with `mac_probe tapwatch` — during a posted Shift
+// hold, real mouseDown/keyDown events arrived with shift=false. So Shift-
+// click, Shift-drag (Photoshop's straight-line brush, Finder multi-select)
+// and Shift+real-key never saw a Tartarus-held modifier.
+//
+// Fix: a session event tap that ORs HELD_FLAGS into every event passing
+// through. HELD_FLAGS is updated before the corresponding modifier event
+// is posted (see send_key), so a release is never re-added. Our own posted
+// events already carry the flags; OR-ing is idempotent. This is the
+// classic user-space approach (Karabiner used it before it had a kernel
+// driver); it needs the same Accessibility grant CGEventPost needs. If the
+// tap can't be created, everything else keeps working and the log says so.
+//
+// (The plan's "no CGEventTap" decision was about D-pad *suppression* —
+// correlating and swallowing the Tartarus's own arrow events — which the
+// HID seize handles. This tap only adds flags; it never drops or
+// reorders events.)
+
+const CG_EVENT_TAP_DISABLED_BY_TIMEOUT: u32 = 0xFFFF_FFFE;
+const CG_EVENT_TAP_DISABLED_BY_USER_INPUT: u32 = 0xFFFF_FFFF;
+
+// The tap port, so the callback can re-arm it if macOS disables it.
+static MODIFIER_BRIDGE_TAP: std::sync::atomic::AtomicPtr<c_void> = std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
+
+extern "C" fn modifier_bridge_callback(_proxy: *mut c_void, event_type: u32, event: *mut c_void, _user: *mut c_void) -> *mut c_void {
+    if event_type == CG_EVENT_TAP_DISABLED_BY_TIMEOUT || event_type == CG_EVENT_TAP_DISABLED_BY_USER_INPUT {
+        // macOS disables a tap whose callback ever stalls; re-arm it.
+        let tap = MODIFIER_BRIDGE_TAP.load(Ordering::SeqCst);
+        if !tap.is_null() {
+            unsafe { CGEventTapEnable(tap, true) };
+        }
+        return event;
+    }
+    let held = HELD_FLAGS.load(Ordering::SeqCst);
+    if held != 0 {
+        unsafe {
+            let flags = CGEventGetFlags(event);
+            if flags & held != held {
+                CGEventSetFlags(event, flags | held);
+            }
+        }
+    }
+    event
+}
+
+fn spawn_modifier_bridge() {
+    std::thread::Builder::new()
+        .name("tartarus-modbridge".into())
+        .spawn(|| unsafe {
+            // Every event type that carries modifier flags an app might
+            // read: all mouse buttons (down/up/dragged), moves, scroll,
+            // and keyboard (down/up/flags). Types per CGEventTypes.h.
+            let types = [1u32, 2, 3, 4, 5, 6, 7, 10, 11, 12, 22, 25, 26, 27];
+            let mask = types.iter().fold(0u64, |m, t| m | (1u64 << t));
+            // kCGSessionEventTap=1, kCGHeadInsertEventTap=0,
+            // kCGEventTapOptionDefault=0 (active: may modify events).
+            let tap = CGEventTapCreate(1, 0, 0, mask, modifier_bridge_callback, std::ptr::null_mut());
+            if tap.is_null() {
+                eprintln!(
+                    "WARNING: could not install the modifier bridge (event tap) — a Shift/Ctrl/Option/\
+                     Command held on the Tartarus will not apply to mouse clicks or the real keyboard. \
+                     This needs the Accessibility permission."
+                );
+                return;
+            }
+            MODIFIER_BRIDGE_TAP.store(tap, Ordering::SeqCst);
+            let source = CFMachPortCreateRunLoopSource(std::ptr::null(), tap, 0);
+            CFRunLoopAddSource(CFRunLoopGetCurrent(), source, kCFRunLoopCommonModes);
+            CGEventTapEnable(tap, true);
+            println!(
+                "Modifier bridge active: modifiers held on the Tartarus now apply to mouse clicks and the \
+                 real keyboard too (Shift-click, Shift-drag, …)."
+            );
+            CFRunLoopRun();
+        })
+        .expect("spawn modifier bridge thread");
 }
 
 // ---------------------------------------------------------------------------
@@ -538,6 +655,9 @@ fn open_if0_seized() -> Result<HidDevice, String> {
 }
 
 pub fn spawn_input_capture(ctrl: &Option<Arc<Mutex<HidDevice>>>) {
+    // Held-modifier bridge for hardware events (see its doc comment).
+    spawn_modifier_bridge();
+
     // Wheel / middle-click: Interface 2, whichever way main.rs managed to
     // open it. Reading a shared (non-seized) handle still remaps, but the
     // OS scrolls too — say so instead of silently double-acting.

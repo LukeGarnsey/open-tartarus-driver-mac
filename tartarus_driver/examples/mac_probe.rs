@@ -47,6 +47,8 @@ pub(super) fn main() {
         Some("seize") => seize(iface(&args), secs(3, 10)),
         Some("dualif2") => dual_if2(secs(2, 15)),
         Some("emit") => emit(secs(2, 8)),
+        Some("modstate") => modstate(),
+        Some("tapwatch") => tapwatch(),
         _ => {
             eprintln!("usage: mac_probe enumerate | analog [secs] | raw <if> [secs] | seize <if> [secs] | emit [delay]");
             std::process::exit(2);
@@ -368,8 +370,21 @@ fn dual_if2(secs: u64) {
 unsafe extern "C" {
     fn CGEventSourceCreate(state_id: i32) -> *mut c_void;
     fn CGEventCreateKeyboardEvent(source: *mut c_void, virtual_key: u16, key_down: bool) -> *mut c_void;
+    fn CGEventGetFlags(event: *mut c_void) -> u64;
     fn CGEventSetFlags(event: *mut c_void, flags: u64);
+    fn CGEventSetType(event: *mut c_void, event_type: u32);
     fn CGEventPost(tap: u32, event: *mut c_void);
+    fn CGEventSourceFlagsState(state_id: i32) -> u64;
+    fn CGEventGetIntegerValueField(event: *mut c_void, field: u32) -> i64;
+    fn CGEventTapCreate(tap: u32, place: u32, options: u32, mask: u64,
+        callback: extern "C" fn(*mut c_void, u32, *mut c_void, *mut c_void) -> *mut c_void, user: *mut c_void) -> *mut c_void;
+    fn CFMachPortCreateRunLoopSource(alloc: *const c_void, port: *mut c_void, order: isize) -> *mut c_void;
+    fn CFRunLoopGetCurrent() -> *mut c_void;
+    fn CFRunLoopAddSource(rl: *mut c_void, src: *mut c_void, mode: *const c_void);
+    fn CFRunLoopRunInMode(mode: *const c_void, seconds: f64, return_after_source: bool) -> i32;
+    fn CGEventTapEnable(tap: *mut c_void, enable: bool);
+    static kCFRunLoopDefaultMode: *const c_void;
+    fn CGEventSourceKeyState(state_id: i32, key: u16) -> bool;
     fn AXIsProcessTrustedWithOptions(options: *const c_void) -> bool;
     static kAXTrustedCheckOptionPrompt: *const c_void;
 }
@@ -479,6 +494,93 @@ fn post_media(nx_keytype: u8, down: bool) {
         let cg: *mut c_void = msg_send![ev, CGEvent];
         CGEventPost(CG_HID_EVENT_TAP, cg);
     });
+}
+
+// Which of macOS's modifier-state views see a Shift that was posted the way
+// platform/macos.rs posts it (flags-changed event, HID tap, combined-session
+// source). Apps differ in which view they consult: NSEvent.modifierFlags /
+// Carbon GetCurrentKeyModifiers read one, event flags another.
+fn modstate() {
+    let read = |label: &str| unsafe {
+        let hid_f = CGEventSourceFlagsState(1);
+        let ses_f = CGEventSourceFlagsState(0);
+        println!(
+            "{label:<22} flags: HIDSystem={:#x} CombinedSession={:#x}  keyState(LShift 0x38): HID={} Session={}",
+            hid_f & 0xffff_ffff, ses_f & 0xffff_ffff,
+            CGEventSourceKeyState(1, 0x38), CGEventSourceKeyState(0, 0x38)
+        );
+    };
+    let src = unsafe { CGEventSourceCreate(0) }; // combined session, as the driver
+    read("before");
+    unsafe {
+        let ev = CGEventCreateKeyboardEvent(src, 0x38, true);
+        CGEventSetType(ev, 12); // kCGEventFlagsChanged
+        CGEventSetFlags(ev, CGEventGetFlags(ev) | FLAG_SHIFT | NX_DEVICELSHIFTKEYMASK);
+        CGEventPost(CG_HID_EVENT_TAP, ev);
+        CFRelease(ev);
+    }
+    for i in 0..4 {
+        std::thread::sleep(Duration::from_millis(250));
+        read(&format!("held +{}ms", (i + 1) * 250));
+    }
+    unsafe {
+        let ev = CGEventCreateKeyboardEvent(src, 0x38, false);
+        CGEventSetType(ev, 12);
+        CGEventSetFlags(ev, CGEventGetFlags(ev) & !(FLAG_SHIFT | NX_DEVICELSHIFTKEYMASK));
+        CGEventPost(CG_HID_EVENT_TAP, ev);
+        CFRelease(ev);
+        CFRelease(src);
+    }
+    std::thread::sleep(Duration::from_millis(250));
+    read("after release");
+}
+
+extern "C" fn tap_cb(_proxy: *mut c_void, ty: u32, ev: *mut c_void, _user: *mut c_void) -> *mut c_void {
+    unsafe {
+        let flags = CGEventGetFlags(ev) & 0xffff_ffff;
+        let key = CGEventGetIntegerValueField(ev, 9); // kCGKeyboardEventKeycode
+        let pid = CGEventGetIntegerValueField(ev, 42); // kCGEventSourceUnixProcessID
+        let name = match ty { 1 => "mouseDown", 3 => "rightDown", 10 => "keyDown", 12 => "flagsChanged", 25 => "otherDown", _ => "other" };
+        println!("  event {name:<12} flags={flags:#010x} shift={} keycode={key} fromPid={pid}", flags & FLAG_SHIFT != 0);
+    }
+    ev
+}
+
+// Holds a synthetic Shift for 8s while an event tap prints the flags on
+// every REAL mouse click / key press that arrives — i.e. what an app that
+// reads modifiers off the event itself (Photoshop) would see.
+fn tapwatch() {
+    let mask: u64 = (1 << 1) | (1 << 3) | (1 << 10) | (1 << 12) | (1 << 25);
+    let tap = unsafe { CGEventTapCreate(1 /*session*/, 0 /*head*/, 1 /*listen only*/, mask, tap_cb, std::ptr::null_mut()) };
+    if tap.is_null() {
+        eprintln!("event tap could not be created (Accessibility?)");
+        return;
+    }
+    unsafe {
+        let src = CFMachPortCreateRunLoopSource(std::ptr::null(), tap, 0);
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), src, kCFRunLoopDefaultMode);
+        CGEventTapEnable(tap, true);
+    }
+    let src = unsafe { CGEventSourceCreate(0) };
+    unsafe {
+        let ev = CGEventCreateKeyboardEvent(src, 0x38, true);
+        CGEventSetType(ev, 12);
+        CGEventSetFlags(ev, CGEventGetFlags(ev) | FLAG_SHIFT | NX_DEVICELSHIFTKEYMASK);
+        CGEventPost(CG_HID_EVENT_TAP, ev);
+        CFRelease(ev);
+    }
+    println!("synthetic Shift is HELD for 8s — click the mouse and press a letter on the real keyboard now:");
+    unsafe { CFRunLoopRunInMode(kCFRunLoopDefaultMode, 8.0, false) };
+    unsafe {
+        let ev = CGEventCreateKeyboardEvent(src, 0x38, false);
+        CGEventSetType(ev, 12);
+        CGEventSetFlags(ev, CGEventGetFlags(ev) & !(FLAG_SHIFT | NX_DEVICELSHIFTKEYMASK));
+        CGEventPost(CG_HID_EVENT_TAP, ev);
+        CFRelease(ev);
+        CFRelease(src);
+    }
+    println!("released. (2 more seconds without Shift — click again for comparison)");
+    unsafe { CFRunLoopRunInMode(kCFRunLoopDefaultMode, 2.0, false) };
 }
 
 fn emit(delay: u64) {

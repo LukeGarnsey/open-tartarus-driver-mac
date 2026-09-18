@@ -89,7 +89,12 @@ of `tartarus_driver`, a Rust driver for the Razer Tartarus Pro keypad.
 - Key emission: hand-rolled CoreGraphics (`CGEventPost`, kVK codes already in
   `key.rs`) + `NSEvent` SystemDefined subtype 8 for media keys. Don't adopt
   `enigo` (no L/R Alt or L/R Cmd distinction). `F21-F24` and `MEDIA_STOP`
-  are `MacKey::Unsupported`.
+  are `MacKey::Unsupported`. Modifiers go out as flags-changed events, and
+  a session **event tap ("modifier bridge")** ORs `HELD_FLAGS` into every
+  hardware event — without it a Tartarus-held Shift never reaches mouse
+  clicks or the real keyboard (verified with `mac_probe tapwatch`,
+  2026-09-18). The "no CGEventTap" rule below is about D-pad suppression
+  only; the bridge never drops or reorders events.
 - Tests must never emit real keystrokes. `platform/mod.rs` shadows
   `send_key` with a logging stand-in under `cfg(test)` on every OS (added
   after `cargo test` on macOS typed four "5"s into the terminal via the
